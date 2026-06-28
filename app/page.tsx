@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import type { GradingResult } from '../lib/grading';
 
 export default function Home() {
-  const [result, setResult] = useState<string>('');
+  const [grading, setGrading] = useState<GradingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export default function Home() {
     if (!rawFile) return;
 
     setLoading(true);
-    setResult('');
+    setGrading(null);
     setError('');
     setSaved(false);
     startTimer();
@@ -69,8 +70,10 @@ export default function Home() {
       const data = await response.json();
       if (data.error) {
         setError(data.error);
+      } else if (data.grading) {
+        setGrading(data.grading);
       } else {
-        setResult(data.result);
+        setError('未返回批改结果');
       }
     } catch {
       setError('网络错误，请重试');
@@ -80,17 +83,18 @@ export default function Home() {
   };
 
   const handleSave = async () => {
-    if (!result) return;
+    if (!grading) return;
     setSaved(true);
     try {
       await fetch('/api/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: preview ? '（含图片题目）' : '',
-          errorAnalysis: result,
+          question: grading.knowledge_point || '（图片题目）',
+          errorAnalysis: grading.analysis,
           subject: '数学',
           imageUrl: '',
+          grading,
         }),
       });
     } catch {}
@@ -101,7 +105,7 @@ export default function Home() {
     if (file) {
       setPreview(URL.createObjectURL(file));
       setError('');
-      setResult('');
+      setGrading(null);
       setSaved(false);
     }
   };
@@ -112,12 +116,13 @@ export default function Home() {
         <header style={styles.header}>
           <div style={styles.logo}>📚</div>
           <h1 style={styles.title}>错题批改助手</h1>
-          <p style={styles.subtitle}>拍照上传题目，AI立即批改并分析错因</p>
+          <p style={styles.subtitle}>拍照上传题目，AI 立即批改并分析错因</p>
         </header>
 
         <nav style={styles.nav}>
           <a href="/history" style={styles.navLink}>📋 错题本</a>
-          <a href="/api/auth/signin" style={styles.navLink}>🔗 Google登录</a>
+          <a href="/dashboard" style={styles.navLink}>📊 掌握度</a>
+          <a href="/api/auth/signin" style={styles.navLink}>🔗 登录</a>
         </nav>
 
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -145,10 +150,7 @@ export default function Home() {
           <button
             type="submit"
             disabled={loading || !preview}
-            style={{
-              ...styles.submitBtn,
-              ...(loading || !preview ? styles.submitDisabled : {})
-            }}
+            style={{ ...styles.submitBtn, ...(loading || !preview ? styles.submitDisabled : {}) }}
           >
             {loading ? (
               <span style={styles.loadingRow}>
@@ -161,10 +163,38 @@ export default function Home() {
 
         {error && <div style={styles.errorBox}>⚠️ {error}</div>}
 
-        {result && (
+        {grading && (
           <div style={styles.resultBox}>
-            <h3 style={styles.resultTitle}>📝 批改结果</h3>
-            <pre style={styles.resultText}>{result}</pre>
+            <div style={grading.is_correct ? styles.verdictOk : styles.verdictBad}>
+              {grading.is_correct ? '✅ 全部正确' : '❌ 存在错误'}
+            </div>
+
+            {!grading.is_correct && grading.error_type && (
+              <Field label="错误类型" value={grading.error_type} tag />
+            )}
+            {grading.knowledge_point && (
+              <Field label="知识点" value={grading.knowledge_point} tag />
+            )}
+            {grading.error_spot && !grading.is_correct && (
+              <Field label="🔍 错误之处" value={grading.error_spot} />
+            )}
+            {grading.correct_solution && (
+              <Field label="✏️ 正确解答" value={grading.correct_solution} pre />
+            )}
+            {grading.analysis && (
+              <Field label="💡 错因分析" value={grading.analysis} />
+            )}
+            {grading.knowledge_tags.length > 0 && (
+              <div style={styles.field}>
+                <div style={styles.fieldLabel}>🏷️ 标签</div>
+                <div style={styles.tags}>
+                  {grading.knowledge_tags.map((t, i) => (
+                    <span key={i} style={styles.tag}>{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <button
               onClick={handleSave}
               disabled={saved}
@@ -181,74 +211,49 @@ export default function Home() {
   );
 }
 
+function Field({ label, value, tag, pre }: { label: string; value: string; tag?: boolean; pre?: boolean }) {
+  return (
+    <div style={styles.field}>
+      <div style={styles.fieldLabel}>{label}</div>
+      {tag ? (
+        <span style={styles.tag}>{value}</span>
+      ) : (
+        <div style={pre ? styles.fieldPre : styles.fieldText}>{value}</div>
+      )}
+    </div>
+  );
+}
+
 const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: '100vh',
-    padding: '20px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  card: {
-    width: '100%',
-    maxWidth: '480px',
-    background: 'white',
-    borderRadius: '24px',
-    padding: '28px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-  },
+  page: { minHeight: '100vh', padding: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  card: { width: '100%', maxWidth: '480px', background: 'white', borderRadius: '24px', padding: '28px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' },
   header: { textAlign: 'center', marginBottom: '20px' },
   logo: { fontSize: '56px', marginBottom: '8px' },
   title: { fontSize: '26px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 6px 0' },
   subtitle: { fontSize: '14px', color: '#888', margin: 0 },
-  nav: { display: 'flex', gap: '10px', marginBottom: '20px' },
-  navLink: {
-    flex: 1, display: 'block', padding: '10px', textAlign: 'center',
-    fontSize: '14px', color: '#667eea', background: '#f0f3ff',
-    textDecoration: 'none', borderRadius: '10px', fontWeight: 500,
-  },
+  nav: { display: 'flex', gap: '8px', marginBottom: '20px' },
+  navLink: { flex: 1, display: 'block', padding: '10px 6px', textAlign: 'center', fontSize: '13px', color: '#667eea', background: '#f0f3ff', textDecoration: 'none', borderRadius: '10px', fontWeight: 500 },
   form: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  uploadArea: {
-    border: '2px dashed #d0d5e0', borderRadius: '16px', padding: '32px 20px',
-    textAlign: 'center', cursor: 'pointer', background: '#fafbfc',
-    transition: 'border-color 0.2s',
-  },
+  uploadArea: { border: '2px dashed #d0d5e0', borderRadius: '16px', padding: '32px 20px', textAlign: 'center', cursor: 'pointer', background: '#fafbfc' },
   uploadPlaceholder: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
   uploadIcon: { fontSize: '44px', marginBottom: '8px' },
   uploadText: { fontSize: '15px', color: '#666', fontWeight: 500 },
   uploadHint: { fontSize: '12px', color: '#aaa', marginTop: '4px' },
   preview: { maxWidth: '100%', maxHeight: '220px', borderRadius: '12px', objectFit: 'contain' },
-  submitBtn: {
-    padding: '16px', fontSize: '17px', fontWeight: 600, color: 'white',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    border: 'none', borderRadius: '14px', cursor: 'pointer', transition: 'opacity 0.2s',
-  },
+  submitBtn: { padding: '16px', fontSize: '17px', fontWeight: 600, color: 'white', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none', borderRadius: '14px', cursor: 'pointer' },
   submitDisabled: { opacity: 0.5, cursor: 'not-allowed' },
   loadingRow: { display: 'inline-flex', alignItems: 'center', gap: '8px' },
-  spinner: {
-    width: '16px', height: '16px', borderRadius: '50%',
-    border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white',
-    animation: 'spin 0.8s linear infinite', display: 'inline-block',
-  },
-  errorBox: {
-    marginTop: '16px', padding: '14px', background: '#fff5f5',
-    border: '1px solid #ffd5d5', borderRadius: '12px', color: '#d63031', fontSize: '14px',
-  },
-  resultBox: {
-    marginTop: '20px', padding: '20px',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf5 100%)',
-    borderRadius: '16px', maxHeight: '360px', overflow: 'auto',
-  },
-  resultTitle: { margin: '0 0 12px 0', fontSize: '16px', color: '#333' },
-  resultText: {
-    whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '14px',
-    lineHeight: '1.7', color: '#444', margin: 0, fontFamily: 'inherit',
-  },
-  saveBtn: {
-    marginTop: '14px', width: '100%', padding: '12px', fontSize: '14px',
-    fontWeight: 600, color: '#667eea', background: 'white', border: '1px solid #667eea',
-    borderRadius: '10px', cursor: 'pointer',
-  },
+  spinner: { width: '16px', height: '16px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', animation: 'spin 0.8s linear infinite', display: 'inline-block' },
+  errorBox: { marginTop: '16px', padding: '14px', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '12px', color: '#d63031', fontSize: '14px' },
+  resultBox: { marginTop: '20px', padding: '20px', background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf5 100%)', borderRadius: '16px', maxHeight: '420px', overflow: 'auto' },
+  verdictOk: { fontSize: '18px', fontWeight: 700, color: '#27ae60', marginBottom: '14px', padding: '10px', background: '#eafaf1', borderRadius: '10px', textAlign: 'center' },
+  verdictBad: { fontSize: '18px', fontWeight: 700, color: '#d63031', marginBottom: '14px', padding: '10px', background: '#fff5f5', borderRadius: '10px', textAlign: 'center' },
+  field: { marginBottom: '14px' },
+  fieldLabel: { fontSize: '12px', fontWeight: 600, color: '#888', marginBottom: '4px' },
+  fieldText: { fontSize: '14px', lineHeight: '1.6', color: '#333' },
+  fieldPre: { fontSize: '13px', lineHeight: '1.6', color: '#333', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'white', padding: '10px', borderRadius: '8px' },
+  tags: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
+  tag: { fontSize: '12px', padding: '3px 10px', borderRadius: '8px', background: '#eef1ff', color: '#667eea', fontWeight: 500 },
+  saveBtn: { marginTop: '6px', width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#667eea', background: 'white', border: '1px solid #667eea', borderRadius: '10px', cursor: 'pointer' },
   savedBtn: { color: '#27ae60', borderColor: '#27ae60', cursor: 'default' },
 };

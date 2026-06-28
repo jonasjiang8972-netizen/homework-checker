@@ -8,6 +8,11 @@
 | 技术实现文档 | [docs/TECHNICAL.md](docs/TECHNICAL.md) | 逐模块实现、API 设计、容错策略 |
 | 用户操作手册 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 使用流程、界面说明、FAQ |
 | 部署运维文档 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 环境变量、建表 SQL、Vercel 部署 |
+| **v2.0 路线图** | [docs/v2.0-ROADMAP.md](docs/v2.0-ROADMAP.md) | 学习闭环系统升级设计与里程碑 |
+| **v2.0 建表 SQL** | [docs/db-schema-v2.sql](docs/db-schema-v2.sql) | 知识点/计划/测验表结构 |
+
+> 当前版本：**v1.3**（MVP + 体验优化完成）
+> 规划版本：**v2.0**（学习闭环系统，见路线图）
 
 ## 项目架构
 - 前端页面：Next.js + React（App Router）

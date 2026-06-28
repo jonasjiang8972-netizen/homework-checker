@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
+import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
 
 function getMimeType(file: File): string {
   if (file.type && file.type.startsWith('image/')) return file.type;
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
   try {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [{
         role: 'user',
         content: [
@@ -43,24 +44,16 @@ export async function POST(request: NextRequest) {
             type: 'image',
             source: { type: 'base64', media_type: mediaType, data: base64 },
           },
-          {
-            type: 'text',
-            text: [
-              '请批改这道题目。',
-              '如果答案正确，请说明"全部正确"。',
-              '如果有错，请按以下结构回答：',
-              '1. 错误之处：指出哪一步错了',
-              '2. 正确解答：给出完整正确过程',
-              '3. 错因分析：为什么会错（概念不清/计算失误/审题错误等）',
-              '4. 涉及知识点：这道题考的是什么',
-            ].join('\n'),
-          },
+          { type: 'text', text: GRADING_PROMPT },
         ],
       }],
     });
 
-    const result = response.content.find(c => c.type === 'text');
-    return NextResponse.json({ result: result && 'text' in result ? result.text : '无法识别内容' });
+    const textBlock = response.content.find(c => c.type === 'text');
+    const raw = textBlock && 'text' in textBlock ? textBlock.text : '';
+    const grading = parseGrading(raw);
+
+    return NextResponse.json({ grading });
   } catch (error) {
     const msg = error instanceof Error ? error.message : '未知错误';
     const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('timed out');
