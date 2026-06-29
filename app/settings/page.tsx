@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { IconSettings, IconLogout } from '../../lib/icons';
 
 export default function Settings() {
   const { data: session, status } = useSession();
@@ -51,15 +52,15 @@ export default function Settings() {
       });
       const json = await res.json();
       if (json.error) {
-        setMessage(`❌ ${json.error}`);
+        setMessage(json.error);
       } else {
         setKeyStatus('has');
         setMaskedKey(json.maskedKey);
         setApiKey('');
-        setMessage('✅ API Key 已加密保存');
+        setMessage('API Key 已加密保存');
       }
     } catch {
-      setMessage('❌ 保存失败');
+      setMessage('保存失败');
     }
     setKeyStatus('none');
   };
@@ -70,9 +71,9 @@ export default function Settings() {
       await fetch('/api/user/key', { method: 'DELETE' });
       setKeyStatus('none');
       setMaskedKey('');
-      setMessage('✅ API Key 已删除');
+      setMessage('API Key 已删除');
     } catch {
-      setMessage('❌ 删除失败');
+      setMessage('删除失败');
     }
   };
 
@@ -84,16 +85,16 @@ export default function Settings() {
         body: JSON.stringify({ defaultSubject, defaultModel }),
       });
       const json = await res.json();
-      setMessage(json.ok ? '✅ 偏好设置已保存' : '❌ 保存失败');
+      setMessage(json.ok ? '已经保存好啦 ✅' : '保存失败');
     } catch {
-      setMessage('❌ 保存失败');
+      setMessage('保存失败');
     }
   };
 
   if (status === 'loading') {
     return (
       <div style={styles.page}>
-        <div style={styles.card}><div style={styles.loading}>加载中...</div></div>
+        <div style={styles.loading}>加载中...</div>
       </div>
     );
   }
@@ -103,9 +104,9 @@ export default function Settings() {
       <div style={styles.page}>
         <div style={styles.card}>
           <div style={styles.empty}>
-            <div style={styles.emptyIcon}>🔐</div>
-            <p style={styles.emptyText}>请先登录以管理你的设置</p>
-            <button onClick={() => signIn('google')} style={styles.primaryBtn}>🔗 Google 登录</button>
+            <div style={styles.emptyIcon}><IconSettings /></div>
+            <p style={styles.emptyText}>登录后才能保存你的设置哦</p>
+            <button onClick={() => signIn('google')} style={styles.primaryBtn}>Google 登录</button>
           </div>
         </div>
       </div>
@@ -114,30 +115,29 @@ export default function Settings() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
-        <header style={styles.header}>
-          <a href="/" style={styles.backLink}>← 返回</a>
-          <h1 style={styles.title}>👤 用户中心</h1>
-          <button onClick={() => signOut()} style={styles.logoutBtn}>退出</button>
-        </header>
+      <div style={styles.header}>
+        <h1 style={styles.title}>设置</h1>
+        <button onClick={() => signOut()} style={styles.logoutBtn}><IconLogout /> 退出</button>
+      </div>
 
-        <div style={styles.userInfo}>
-          <div style={styles.avatar}>
-            {session?.user?.image
-              ? <img src={session.user.image} alt="" style={styles.avatarImg} />
-              : '👤'}
-          </div>
-          <div>
-            <div style={styles.userName}>{session?.user?.name || '用户'}</div>
-            <div style={styles.userEmail}>{session?.user?.email}</div>
-          </div>
+      <div style={styles.userInfo}>
+        <div style={styles.avatar}>
+          {session?.user?.image
+            ? <img src={session.user.image} alt="" style={styles.avatarImg} />
+            : <IconSettings />}
         </div>
+        <div>
+          <div style={styles.userName}>{session?.user?.name || '用户'}</div>
+          <div style={styles.userEmail}>{session?.user?.email}</div>
+        </div>
+      </div>
 
-        {message && <div style={styles.msg}>{message}</div>}
+      {message && <div style={styles.msg}>{message}</div>}
 
+      <div style={styles.card}>
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>🔑 Claude API Key</h2>
-          <p style={styles.sectionDesc}>填写你自己的 API Key，会加密存储（AES-256-GCM），仅用于批改请求。</p>
+          <h2 style={styles.sectionTitle}>API 密钥（给爸爸妈妈填）</h2>
+          <p style={styles.sectionDesc}>这里需要请爸爸妈妈帮忙填写，会加密存储，放心使用。</p>
 
           {keyStatus === 'has' && (
             <div style={styles.keyInfo}>
@@ -163,15 +163,15 @@ export default function Settings() {
             </button>
           </div>
           <a href="https://console.anthropic.com" target="_blank" style={styles.extLink}>
-            获取 Claude API Key →
+            获取 Claude API Key
           </a>
         </section>
 
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>⚙️ 偏好设置</h2>
+          <h2 style={styles.sectionTitle}>我的偏好</h2>
 
           <div style={styles.settingRow}>
-            <label style={styles.settingLabel}>默认学科</label>
+            <label style={styles.settingLabel}>常学的学科</label>
             <select value={defaultSubject} onChange={e => setDefaultSubject(e.target.value)} style={styles.select}>
               <option value="数学">数学</option>
               <option value="语文">语文</option>
@@ -181,7 +181,7 @@ export default function Settings() {
           </div>
 
           <div style={styles.settingRow}>
-            <label style={styles.settingLabel}>默认模型</label>
+            <label style={styles.settingLabel}>AI 模型</label>
             <select value={defaultModel} onChange={e => setDefaultModel(e.target.value)} style={styles.select}>
               <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
               <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
@@ -190,7 +190,7 @@ export default function Settings() {
             </select>
           </div>
 
-          <button onClick={handleSaveSettings} style={styles.primaryBtn}>保存偏好</button>
+          <button onClick={handleSaveSettings} style={styles.primaryBtn}>保存</button>
         </section>
       </div>
     </div>
@@ -198,33 +198,32 @@ export default function Settings() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: '100vh', padding: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-  card: { maxWidth: '480px', margin: '0 auto', background: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' },
+  page: { maxWidth: '480px', margin: '0 auto', padding: '20px 16px 80px', background: '#f8f9fc', minHeight: '100vh' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' },
-  backLink: { color: '#667eea', textDecoration: 'none', fontSize: '14px', width: '60px' },
-  title: { fontSize: '20px', fontWeight: 700, color: '#1a1a2e', margin: 0 },
-  logoutBtn: { padding: '6px 14px', fontSize: '12px', color: '#888', background: '#f0f0f0', border: 'none', borderRadius: '8px', cursor: 'pointer' },
-  loading: { textAlign: 'center', padding: '40px', color: '#888' },
-  empty: { textAlign: 'center', padding: '40px 20px' },
-  emptyIcon: { fontSize: '56px', marginBottom: '12px' },
-  emptyText: { color: '#888', marginBottom: '16px' },
-  userInfo: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: '#f8f9fc', borderRadius: '14px', marginBottom: '20px' },
-  avatar: { width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eef1ff' },
+  title: { fontSize: '22px', fontWeight: 700, color: '#1a1a2e', margin: 0 },
+  logoutBtn: { display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 14px', fontSize: '12px', color: '#8e95a2', background: '#f0f2f5', border: 'none', borderRadius: '8px', cursor: 'pointer' },
+  loading: { textAlign: 'center', padding: '40px', color: '#8e95a2' },
+  empty: { textAlign: 'center', padding: '48px 20px' },
+  emptyIcon: { width: '48px', height: '48px', margin: '0 auto 12px', color: '#c0c4cc' },
+  emptyText: { color: '#8e95a2', marginBottom: '16px', fontSize: '14px' },
+  userInfo: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4', marginBottom: '16px' },
+  avatar: { width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eef1ff', color: '#4f6ef7' },
   avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  userName: { fontSize: '16px', fontWeight: 600, color: '#1a1a2e' },
-  userEmail: { fontSize: '13px', color: '#888' },
-  msg: { padding: '10px 14px', borderRadius: '10px', background: '#eafaf1', color: '#27ae60', fontSize: '13px', marginBottom: '14px' },
-  section: { marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid #eee' },
-  sectionTitle: { fontSize: '16px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 6px 0' },
-  sectionDesc: { fontSize: '13px', color: '#888', margin: '0 0 14px 0', lineHeight: '1.5' },
-  keyInfo: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#eef1ff', borderRadius: '10px', fontSize: '13px', color: '#667eea', fontWeight: 500, marginBottom: '12px' },
-  dangerBtn: { padding: '4px 10px', fontSize: '12px', color: '#d63031', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '6px', cursor: 'pointer' },
+  userName: { fontSize: '15px', fontWeight: 600, color: '#1a1a2e' },
+  userEmail: { fontSize: '12px', color: '#8e95a2' },
+  msg: { padding: '10px 14px', borderRadius: '8px', background: '#eafaf1', color: '#27ae60', fontSize: '12px', marginBottom: '12px' },
+  card: { background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #eef0f4' },
+  section: { marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #eef0f4' },
+  sectionTitle: { fontSize: '15px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 4px 0' },
+  sectionDesc: { fontSize: '12px', color: '#8e95a2', margin: '0 0 12px 0', lineHeight: '1.5' },
+  keyInfo: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#eef1ff', borderRadius: '8px', fontSize: '12px', color: '#4f6ef7', fontWeight: 500, marginBottom: '10px' },
+  dangerBtn: { padding: '4px 10px', fontSize: '11px', color: '#d63031', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '6px', cursor: 'pointer' },
   keyInputRow: { display: 'flex', gap: '8px', marginBottom: '8px' },
-  keyInput: { flex: 1, padding: '10px 12px', fontSize: '14px', border: '1px solid #e0e4ee', borderRadius: '10px', outline: 'none', fontFamily: 'monospace' },
-  primaryBtn: { padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: 'white', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none', borderRadius: '10px', cursor: 'pointer' },
+  keyInput: { flex: 1, padding: '10px 12px', fontSize: '14px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', fontFamily: 'monospace' },
+  primaryBtn: { padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '8px', cursor: 'pointer' },
   btnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
-  extLink: { display: 'inline-block', fontSize: '12px', color: '#667eea', textDecoration: 'none' },
+  extLink: { display: 'inline-block', fontSize: '12px', color: '#4f6ef7', textDecoration: 'none' },
   settingRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
-  settingLabel: { fontSize: '14px', fontWeight: 500, color: '#555' },
-  select: { padding: '8px 12px', fontSize: '13px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', color: '#333', background: 'white' },
+  settingLabel: { fontSize: '13px', fontWeight: 500, color: '#555' },
+  select: { padding: '8px 12px', fontSize: '12px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', color: '#333', background: 'white' },
 };

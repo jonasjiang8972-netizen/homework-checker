@@ -1,14 +1,19 @@
 import { getSupabase } from '../../../lib/supabase';
 import { aggregateStats } from '../../../lib/mastery';
+import { getApiKey, getUserId } from '../../../lib/auth-utils';
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
-async function getWeakPoints(): Promise<string[]> {
+async function getWeakPoints(userId: string | null): Promise<string[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
-  const { data } = await supabase
+  let query = supabase
     .from('questions')
     .select('knowledge_point, is_correct');
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  const { data } = await query;
   const stats = aggregateStats(data || []);
   return stats.filter(s => s.weak).map(s => s.name);
 }
@@ -54,10 +59,14 @@ export async function GET() {
     return NextResponse.json({ plans: [], warning: '未配置数据库' });
   }
 
-  const { data, error } = await supabase
-    .from('study_plans')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const userId = await getUserId();
+  let query = supabase.from('study_plans').select('*');
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: '获取计划列表失败' }, { status: 500 });
@@ -66,10 +75,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey.startsWith('your_')) {
+  const apiKey = await getApiKey();
+  if (!apiKey) {
     return NextResponse.json(
-      { error: '未配置 Claude API Key，请输入 ANTHROPIC_API_KEY' },
+      { error: '未配置 Claude API Key，请在设置页添加或配置环境变量' },
       { status: 503 }
     );
   }
@@ -79,7 +88,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '未配置数据库，无法创建计划' }, { status: 503 });
   }
 
-  const weakPoints = await getWeakPoints();
+  const userId = await getUserId();
+  const weakPoints = await getWeakPoints(userId);
   if (weakPoints.length === 0) {
     return NextResponse.json({ error: '暂无薄弱知识点，多批改几道题再来生成计划' }, { status: 400 });
   }
@@ -108,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     const rows = parsed.map(p => ({
-      user_id: null,
+      user_id: userId,
       title: p.title,
       target_knowledge_point: p.knowledge_point,
       current_mastery: 30,
@@ -143,6 +153,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: '未配置数据库' }, { status: 503 });
   }
 
+  const userId = await getUserId();
+
   let body: { id?: string; status?: string };
   try {
     body = await request.json();
@@ -159,10 +171,16 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: `状态必须为 ${validStatuses.join('/')}` }, { status: 400 });
   }
 
-  const { error } = await supabase
+  let query = supabase
     .from('study_plans')
     .update({ status: body.status })
     .eq('id', body.id);
+
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { error } = await query;
 
   if (error) {
     return NextResponse.json({ error: '更新失败' }, { status: 500 });

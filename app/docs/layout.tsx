@@ -18,7 +18,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
     <div style={styles.shell}>
       <aside style={styles.sidebar}>
         <div style={styles.brand}>
-          <Link href="/" style={styles.brandLink}>📚 错题批改助手</Link>
+          <Link href="/" style={styles.brandLink}>📚 作业小帮手</Link>
         </div>
         <div style={styles.brandSub}>项目材料文档</div>
         <nav style={styles.nav}>

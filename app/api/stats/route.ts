@@ -1,5 +1,6 @@
 import { getSupabase } from '../../../lib/supabase';
 import { aggregateStats } from '../../../lib/mastery';
+import { getUserId } from '../../../lib/auth-utils';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -8,11 +9,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ stats: [], warning: '未配置数据库' });
   }
 
+  const userId = await getUserId();
   const { searchParams } = new URL(request.url);
   const subject = searchParams.get('subject');
 
   let query = supabase.from('questions').select('knowledge_point, is_correct, subject');
 
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
   if (subject && subject !== '全部') {
     query = query.eq('subject', subject);
   }

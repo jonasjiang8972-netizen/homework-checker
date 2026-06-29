@@ -1,10 +1,10 @@
-# 📚 错题批改助手
+# 📚 作业小帮手
 
 <div align="center">
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.2.2-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -114,6 +114,7 @@ homework-checker/
 │   ├── api/                   # API Routes
 │   │   ├── auth/             # NextAuth 登录
 │   │   ├── correct/          # 拍照批改接口
+│   │   ├── user/             # 用户 Key / 设置
 │   │   ├── questions/        # 错题 CRUD
 │   │   ├── stats/            # 掌握度统计
 │   │   ├── plans/            # 学习计划生成
@@ -134,7 +135,7 @@ homework-checker/
 │   ├── TECHNICAL.md          # 技术实现细节
 │   ├── USER_GUIDE.md         # 用户操作手册
 │   ├── DEPLOYMENT.md         # 部署运维指南
-│   ├── v2.0-ROADMAP.md       # v2.0 路线图
+│   ├── v2.4-ROADMAP.md       # v2.4 路线图
 │   └── db-schema-v2.sql      # 数据库结构
 ├── .env.local                 # 环境变量（不提交）
 ├── Dockerfile                 # Docker 构建
@@ -246,7 +247,7 @@ chmod +x setup.sh && ./setup.sh
 | [技术实现文档](docs/TECHNICAL.md) | 逐模块实现细节、容错策略 |
 | [用户操作手册](docs/USER_GUIDE.md) | 使用流程、界面说明、FAQ |
 | [部署运维指南](docs/DEPLOYMENT.md) | 环境变量、建表 SQL、Vercel 部署 |
-| [v2.0 路线图](docs/v2.0-ROADMAP.md) | 学习闭环系统升级设计 |
+| [v2.4 路线图](docs/v2.4-ROADMAP.md) | 用户体系 + 友善语言优化 |
 
 ---
 

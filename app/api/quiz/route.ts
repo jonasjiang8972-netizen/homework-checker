@@ -1,5 +1,6 @@
 import { getSupabase } from '../../../lib/supabase';
 import { calculateNewMastery } from '../../../lib/mastery';
+import { getApiKey, getUserId } from '../../../lib/auth-utils';
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -99,12 +100,13 @@ async function upsertKnowledgePoint(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   name: string,
   isCorrect: boolean,
+  userId: string | null,
 ) {
-  const { data: existing } = await supabase
-    .from('knowledge_points')
-    .select('*')
-    .eq('name', name)
-    .single();
+  let query = supabase.from('knowledge_points').select('*').eq('name', name);
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  const { data: existing } = await query.single();
 
   const prevMastery = existing?.mastery_level ?? 50;
   const prevTotal = existing?.total_count ?? 0;
@@ -133,6 +135,7 @@ async function upsertKnowledgePoint(
         total_count: newTotal,
         correct_count: newCorrect,
         last_practiced_at: new Date().toISOString(),
+        user_id: userId,
       });
   }
 }
@@ -143,10 +146,14 @@ export async function GET() {
     return NextResponse.json({ records: [], warning: '未配置数据库' });
   }
 
-  const { data, error } = await supabase
-    .from('test_records')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const userId = await getUserId();
+  let query = supabase.from('test_records').select('*');
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: '获取测验记录失败' }, { status: 500 });
@@ -155,15 +162,17 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey.startsWith('your_')) {
-    return NextResponse.json({ error: '未配置 Claude API Key' }, { status: 503 });
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    return NextResponse.json({ error: '未配置 Claude API Key，请在设置页添加或配置环境变量' }, { status: 503 });
   }
 
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ error: '未配置数据库' }, { status: 503 });
   }
+
+  const userId = await getUserId();
 
   let body: any;
   try {
@@ -176,13 +185,14 @@ export async function POST(request: NextRequest) {
     return handleSubmit(supabase, apiKey, body);
   }
 
-  return handleGenerate(supabase, apiKey, body);
+  return handleGenerate(supabase, apiKey, body, userId);
 }
 
 async function handleGenerate(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   apiKey: string,
   body: any,
+  userId: string | null,
 ) {
   const knowledgePoint = body.knowledge_point?.trim();
   if (!knowledgePoint) {
@@ -215,7 +225,7 @@ async function handleGenerate(
     const { data, error } = await supabase
       .from('test_records')
       .insert({
-        user_id: null,
+        user_id: userId,
         plan_id: body.plan_id || null,
         knowledge_point: knowledgePoint,
         questions_json: questions,
@@ -303,10 +313,11 @@ async function handleSubmit(
       })
       .eq('id', recordId);
 
+    const userId = await getUserId();
     const kp = record.knowledge_point;
     if (kp) {
       for (const r of grade.results) {
-        await upsertKnowledgePoint(supabase, kp, r.correct);
+        await upsertKnowledgePoint(supabase, kp, r.correct, userId);
       }
     }
 

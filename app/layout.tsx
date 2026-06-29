@@ -1,15 +1,16 @@
 import { SessionProvider } from './components/SessionProvider';
+import { BottomNav } from './components/BottomNav';
 
 export const metadata = {
-  title: '错题批改助手',
-  description: 'AI辅助批改数学错题，拍照即批改',
+  title: '作业小帮手',
+  description: '学无尽，勤精进 — AI 辅助错题批改与学习计划',
 };
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#667eea',
+  themeColor: '#4f6ef7',
 };
 
 export default function RootLayout({
@@ -22,8 +23,13 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css" />
       </head>
-      <body style={{ margin: 0, padding: 0, background: '#f5f7fa' }}>
-        <SessionProvider>{children}</SessionProvider>
+      <body style={{ margin: 0, padding: 0, background: '#f8f9fc', minHeight: '100vh' }}>
+        <SessionProvider>
+          <div style={{ paddingBottom: '80px', paddingTop: '0', minHeight: '100vh' }}>
+            {children}
+          </div>
+          <BottomNav />
+        </SessionProvider>
       </body>
     </html>
   );

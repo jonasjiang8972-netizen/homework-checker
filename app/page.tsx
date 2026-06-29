@@ -3,8 +3,10 @@
 import { useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import type { GradingResult } from '../lib/grading';
-import { ModelSelector } from './components/ModelSelector';
 import { MarkdownRenderer } from '../lib/markdown-renderer';
+import { IconCamera, IconCheck, IconX } from '../lib/icons';
+
+const SUBJECTS = ['数学', '语文', '英语', '其他'];
 
 export default function Home() {
   const { data: session } = useSession();
@@ -16,9 +18,9 @@ export default function Home() {
   const [error, setError] = useState<string>('');
   const [saved, setSaved] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [subject, setSubject] = useState('数学');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve) => {
@@ -31,15 +33,10 @@ export default function Home() {
         const scale = Math.min(1, maxW / img.width);
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob(
-          (blob) => {
-            URL.revokeObjectURL(url);
-            resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file);
-          },
-          'image/jpeg',
-          0.85
+          (blob) => { URL.revokeObjectURL(url); resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file); },
+          'image/jpeg', 0.85
         );
       };
       img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
@@ -51,41 +48,22 @@ export default function Home() {
     setElapsed(0);
     timerRef.current = setInterval(() => setElapsed((t) => t + 1), 1000);
   };
-  const stopTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-  };
+  const stopTimer = () => { if (timerRef.current) clearInterval(timerRef.current); timerRef.current = null; };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = e.currentTarget;
-    const fileInput = form.image as HTMLInputElement;
-    const rawFile = fileInput.files?.[0];
+    const fileInput = fileRef.current;
+    const rawFile = fileInput?.files?.[0];
     if (!rawFile) return;
 
-    setRetryCount(0);
-    setLoading(true);
-    setGrading(null);
-    setError('');
-    setSaved(false);
+    setLoading(true); setGrading(null); setError(''); setSaved(false);
     startTimer();
-
-    const steps = ['🔄 正在压缩图片...', '📤 正在上传图片...', '🧠 AI 正在批改...'];
-    let stepIndex = 0;
-
-    const showLoadingStep = () => {
-      if (stepIndex < steps.length) {
-        setLoadingDetail(steps[stepIndex]);
-        stepIndex++;
-      }
-    };
-
-    showLoadingStep();
+    setLoadingDetail('正在准备图片...');
 
     try {
       const compressed = await compressImage(rawFile);
-      showLoadingStep();
-      
+      setLoadingDetail('正在准备图片...');
+
       const formData = new FormData();
       formData.append('image', compressed);
       const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
@@ -93,29 +71,20 @@ export default function Home() {
 
       const response = await fetch('/api/correct', { method: 'POST', body: formData });
       const data = await response.json();
-      
+
       if (data.error) {
         setError(data.error);
-        setRetryCount(prev => prev + 1);
-        if (retryCount < 2 && data.retryCount !== undefined) {
-          setLoadingDetail(`⚠️ 重试中 (${retryCount + 1}/3)...`);
-          setTimeout(() => handleSubmit(e), 1500);
-          return;
-        }
       } else if (data.grading) {
         setGrading(data.grading);
         setImageUrl(data.imageUrl || null);
-        setLoadingDetail('✅ 批改完成');
+        setLoadingDetail('完成啦');
       } else {
-        setError('未返回批改结果');
+        setError('没有拿到结果，再试一次吧');
       }
-    } catch (err) {
-      setError('网络错误，请重试');
-      setRetryCount(prev => prev + 1);
+    } catch {
+      setError('好像出了点小问题，再试一次吧');
     } finally {
-      stopTimer();
-      setLoading(false);
-      setLoadingDetail('');
+      stopTimer(); setLoading(false); setLoadingDetail('');
     }
   };
 
@@ -141,202 +110,126 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (file) {
       setPreview(URL.createObjectURL(file));
-      setError('');
-      setGrading(null);
-      setSaved(false);
+      setError(''); setGrading(null); setSaved(false);
     }
   };
 
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
-        <header style={styles.header}>
-          <div style={styles.logo}>📚</div>
-          <h1 style={styles.title}>错题批改助手</h1>
-          <p style={styles.subtitle}>拍照上传题目，AI 立即批改并分析错因</p>
-        </header>
-
-        <div style={styles.modelSelector}>
-          <ModelSelector />
-        </div>
-
+      <div style={styles.header}>
+        <h1 style={styles.title}>作业小帮手</h1>
+        <p style={styles.slogan}>每天进步一点点 🌱</p>
         <div style={styles.subjectRow}>
-          <span style={styles.subjectLabel}>学科：</span>
-          {['数学', '语文', '英语', '其他'].map(s => (
+          {SUBJECTS.map(s => (
             <button
               key={s}
               onClick={() => setSubject(s)}
-              style={{
-                ...styles.subjectBtn,
-                ...(subject === s ? styles.subjectBtnActive : {}),
-              }}
-            >
-              {s}
-            </button>
+              style={{ ...styles.opt, ...(subject === s ? styles.optActive : {}) }}
+            >{s}</button>
           ))}
         </div>
-
-        <nav style={styles.nav}>
-          <a href="/history" style={styles.navLink}>📋 错题本</a>
-          <a href="/dashboard" style={styles.navLink}>📊 掌握度</a>
-          <a href="/plans" style={styles.navLink}>📋 计划</a>
-          <a href="/quiz" style={styles.navLink}>📝 测验</a>
-        </nav>
-        <div style={styles.userBar}>
-          {session ? (
-            <a href="/settings" style={styles.userLink}>
-              <span style={styles.userDot} />
-              {session.user?.name || session.user?.email}
-            </a>
-          ) : (
-            <a href="/api/auth/signin" style={styles.userLink}>🔗 登录</a>
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.uploadArea}>
-            {preview ? (
-              <img src={preview} alt="题目预览" style={styles.preview} />
-            ) : (
-              <div style={styles.uploadPlaceholder}>
-                <div style={styles.uploadIcon}>📷</div>
-                <div style={styles.uploadText}>点击选择题目图片</div>
-                <div style={styles.uploadHint}>支持拍照或从相册选择</div>
-              </div>
-            )}
-            <input
-              type="file"
-              name="image"
-              accept="image/*"
-              capture="environment"
-              required
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
-            />
-          </label>
-
-          <button
-            type="submit"
-            disabled={loading || !preview}
-            style={{ ...styles.submitBtn, ...(loading || !preview ? styles.submitDisabled : {}) }}
-          >
-            {loading ? (
-              <span style={styles.loadingRow}>
-                <span style={styles.spinner} />
-                批改中... {elapsed}s
-              </span>
-            ) : '✨ 开始批改'}
-          </button>
-        </form>
-
-        {error && <div style={styles.errorBox}>⚠️ {error}</div>}
-
-        {grading && (
-          <div style={styles.resultBox}>
-            <div style={grading.is_correct ? styles.verdictOk : styles.verdictBad}>
-              {grading.is_correct ? '✅ 全部正确' : '❌ 存在错误'}
-            </div>
-
-            {!grading.is_correct && grading.error_type && (
-              <Field label="错误类型" value={grading.error_type} tag />
-            )}
-            {grading.knowledge_point && (
-              <Field label="知识点" value={grading.knowledge_point} tag />
-            )}
-            {grading.error_spot && !grading.is_correct && (
-              <Field label="🔍 错误之处" value={grading.error_spot} md />
-            )}
-            {grading.correct_solution && (
-              <Field label="✏️ 正确解答" value={grading.correct_solution} md />
-            )}
-            {grading.analysis && (
-              <Field label="💡 错因分析" value={grading.analysis} md />
-            )}
-            {grading.knowledge_tags.length > 0 && (
-              <div style={styles.field}>
-                <div style={styles.fieldLabel}>🏷️ 标签</div>
-                <div style={styles.tags}>
-                  {grading.knowledge_tags.map((t, i) => (
-                    <span key={i} style={styles.tag}>{t}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={handleSave}
-              disabled={saved}
-              style={{ ...styles.saveBtn, ...(saved ? styles.savedBtn : {}) }}
-            >
-              {saved ? '✓ 已存入错题本' : '💾 存入错题本'}
-            </button>
-          </div>
-        )}
       </div>
 
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-}
+      {loading && (
+        <div style={styles.loadingBox}>
+          <div style={styles.spinner} />
+          <div style={styles.loadingText}>{loadingDetail} {elapsed}s</div>
+        </div>
+      )}
 
-function Field({ label, value, tag, pre, md }: { label: string; value: string; tag?: boolean; pre?: boolean; md?: boolean }) {
-  return (
-    <div style={styles.field}>
-      <div style={styles.fieldLabel}>{label}</div>
-      {tag ? (
-        <span style={styles.tag}>{value}</span>
-      ) : md ? (
-        <MarkdownRenderer content={value} />
-      ) : (
-        <div style={pre ? styles.fieldPre : styles.fieldText}>{value}</div>
+      {error && <div style={styles.error}>{error}</div>}
+
+      <div style={styles.uploadArea} onClick={() => !loading && fileRef.current?.click()}>
+        {preview ? (
+          <img src={preview} alt="预览" style={styles.preview} />
+        ) : (
+          <div style={styles.uploadPlaceholder}>
+            <div style={styles.uploadIcon}><IconCamera /></div>
+            <div style={styles.uploadText}>点击拍照或选择图片</div>
+          </div>
+        )}
+        <input ref={fileRef} type="file" name="image" accept="image/*" capture="environment" onChange={handleFileChange} style={{ display: 'none' }} />
+      </div>
+
+      {!loading && (
+        <button
+          onClick={() => fileRef.current?.form?.requestSubmit()}
+          disabled={!preview}
+          style={{ ...styles.btn, ...(!preview ? styles.btnDisabled : {}) }}
+        >帮我看看</button>
+      )}
+
+      <form onSubmit={handleSubmit} style={{ display: 'none' }} />
+
+      {grading && (
+        <div style={styles.result}>
+          <div style={grading.is_correct ? styles.verdictOk : styles.verdictBad}>
+            {grading.is_correct ? <><IconCheck /> 全对，真棒</> : <><IconX /> 一起看看怎么改进</>}
+          </div>
+          {!grading.is_correct && grading.error_type && <Tag label="订正类型" value={grading.error_type} />}
+          {grading.knowledge_point && <Tag label="知识点" value={grading.knowledge_point} />}
+          {!grading.is_correct && grading.error_spot && <Section title="你的订正" content={grading.error_spot} md />}
+          {grading.correct_solution && <Section title="正确答案" content={grading.correct_solution} md />}
+          {grading.analysis && <Section title="为什么错了" content={grading.analysis} md />}
+          {grading.knowledge_tags.length > 0 && (
+            <div style={styles.tags}>{grading.knowledge_tags.map((t, i) => <span key={i} style={styles.tag}>{t}</span>)}</div>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saved}
+            style={{ ...styles.btn, ...(saved ? styles.btnSaved : {}), marginTop: '12px' }}
+          >{saved ? '已记下来 📖' : '记下来 📖'}</button>
+        </div>
       )}
     </div>
   );
 }
 
+function Tag({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={styles.field}>
+      <div style={styles.fieldLabel}>{label}</div>
+      <span style={styles.badge}>{value}</span>
+    </div>
+  );
+}
+
+function Section({ title, content, md }: { title: string; content: string; md?: boolean }) {
+  return (
+    <div style={styles.field}>
+      <div style={styles.fieldLabel}>{title}</div>
+      {md ? <MarkdownRenderer content={content} /> : <div style={styles.fieldVal}>{content}</div>}
+    </div>
+  );
+}
+
 const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: '100vh', padding: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  card: { width: '100%', maxWidth: '480px', background: 'white', borderRadius: '24px', padding: '28px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' },
-  header: { textAlign: 'center', marginBottom: '20px' },
-  logo: { fontSize: '56px', marginBottom: '8px' },
-  title: { fontSize: '26px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 6px 0' },
-  subtitle: { fontSize: '14px', color: '#888', margin: 0 },
-  nav: { display: 'flex', gap: '8px', marginBottom: '12px' },
-  navLink: { flex: 1, display: 'block', padding: '10px 6px', textAlign: 'center', fontSize: '13px', color: '#667eea', background: '#f0f3ff', textDecoration: 'none', borderRadius: '10px', fontWeight: 500 },
-  userBar: { textAlign: 'center', marginBottom: '16px' },
-  userLink: { display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#888', textDecoration: 'none', padding: '4px 12px', borderRadius: '8px', background: '#f5f5f5' },
-  userDot: { width: '8px', height: '8px', borderRadius: '50%', background: '#27ae60', display: 'inline-block' },
-  form: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  uploadArea: { border: '2px dashed #d0d5e0', borderRadius: '16px', padding: '32px 20px', textAlign: 'center', cursor: 'pointer', background: '#fafbfc' },
-  uploadPlaceholder: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  uploadIcon: { fontSize: '44px', marginBottom: '8px' },
-  uploadText: { fontSize: '15px', color: '#666', fontWeight: 500 },
-  uploadHint: { fontSize: '12px', color: '#aaa', marginTop: '4px' },
+  page: { maxWidth: '480px', margin: '0 auto', padding: '20px 16px 80px' },
+  header: { marginBottom: '20px' },
+  title: { fontSize: '22px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 4px 0' },
+  slogan: { fontSize: '13px', color: '#8e95a2', margin: '0 0 12px 0', lineHeight: '1.5' },
+  subjectRow: { display: 'flex', gap: '8px' },
+  opt: { padding: '6px 16px', fontSize: '13px', fontWeight: 500, color: '#666', background: '#f0f2f5', border: 'none', borderRadius: '8px', cursor: 'pointer' },
+  optActive: { color: 'white', background: '#4f6ef7' },
+  uploadArea: { border: '2px dashed #dde0e8', borderRadius: '16px', padding: '40px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: '12px' },
+  uploadPlaceholder: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' },
+  uploadIcon: { color: '#8e95a2', width: '40px', height: '40px' },
+  uploadText: { fontSize: '14px', color: '#8e95a2', fontWeight: 500 },
   preview: { maxWidth: '100%', maxHeight: '220px', borderRadius: '12px', objectFit: 'contain' },
-  submitBtn: { padding: '16px', fontSize: '17px', fontWeight: 600, color: 'white', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none', borderRadius: '14px', cursor: 'pointer' },
-  submitDisabled: { opacity: 0.5, cursor: 'not-allowed' },
-  loadingRow: { display: 'inline-flex', alignItems: 'center', gap: '8px' },
-  spinner: { width: '16px', height: '16px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', animation: 'spin 0.8s linear infinite', display: 'inline-block' },
-  errorBox: { marginTop: '16px', padding: '14px', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '12px', color: '#d63031', fontSize: '14px' },
-  resultBox: { marginTop: '20px', padding: '20px', background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf5 100%)', borderRadius: '16px', maxHeight: '420px', overflow: 'auto' },
-  verdictOk: { fontSize: '18px', fontWeight: 700, color: '#27ae60', marginBottom: '14px', padding: '10px', background: '#eafaf1', borderRadius: '10px', textAlign: 'center' },
-  verdictBad: { fontSize: '18px', fontWeight: 700, color: '#d63031', marginBottom: '14px', padding: '10px', background: '#fff5f5', borderRadius: '10px', textAlign: 'center' },
-  field: { marginBottom: '14px' },
-  fieldLabel: { fontSize: '12px', fontWeight: 600, color: '#888', marginBottom: '4px' },
-  fieldText: { fontSize: '14px', lineHeight: '1.6', color: '#333' },
-  fieldPre: { fontSize: '13px', lineHeight: '1.6', color: '#333', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'white', padding: '10px', borderRadius: '8px' },
-  tags: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
-  tag: { fontSize: '12px', padding: '3px 10px', borderRadius: '8px', background: '#eef1ff', color: '#667eea', fontWeight: 500 },
-  saveBtn: { marginTop: '6px', width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#667eea', background: 'white', border: '1px solid #667eea', borderRadius: '10px', cursor: 'pointer' },
-  savedBtn: { color: '#27ae60', borderColor: '#27ae60', cursor: 'default' },
-  modelSelector: { marginBottom: '12px' },
-  subjectRow: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' },
-  subjectLabel: { fontSize: '13px', fontWeight: 500, color: '#666', whiteSpace: 'nowrap' },
-  subjectBtn: {
-    flex: 1, padding: '7px 0', fontSize: '13px', fontWeight: 500, color: '#666',
-    background: '#f0f0f0', border: 'none', borderRadius: '10px', cursor: 'pointer',
-  },
-  subjectBtnActive: {
-    color: 'white', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  },
+  btn: { width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '12px', cursor: 'pointer' },
+  btnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
+  btnSaved: { color: '#27ae60', background: '#eafaf1', cursor: 'default' },
+  loadingBox: { textAlign: 'center', padding: '40px', color: '#8e95a2' },
+  spinner: { width: '32px', height: '32px', borderRadius: '50%', border: '3px solid #eef0f4', borderTopColor: '#4f6ef7', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' },
+  loadingText: { fontSize: '14px' },
+  error: { padding: '12px 16px', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '10px', color: '#d63031', fontSize: '13px', marginBottom: '12px' },
+  result: { marginTop: '16px', padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4' },
+  verdictOk: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '16px', fontWeight: 600, color: '#27ae60', marginBottom: '12px' },
+  verdictBad: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '16px', fontWeight: 600, color: '#d63031', marginBottom: '12px' },
+  field: { marginBottom: '12px' },
+  fieldLabel: { fontSize: '12px', fontWeight: 600, color: '#8e95a2', marginBottom: '4px' },
+  fieldVal: { fontSize: '14px', lineHeight: '1.6', color: '#333' },
+  badge: { fontSize: '13px', fontWeight: 500, padding: '3px 10px', borderRadius: '6px', background: '#eef1ff', color: '#4f6ef7', display: 'inline-block' },
+  tags: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
+  tag: { fontSize: '12px', fontWeight: 500, padding: '3px 8px', borderRadius: '6px', background: '#eef1ff', color: '#4f6ef7' },
 };

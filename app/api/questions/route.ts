@@ -1,4 +1,5 @@
 import { getSupabase } from '../../../lib/supabase';
+import { getUserId } from '../../../lib/auth-utils';
 import { NextRequest, NextResponse } from 'next/server';
 import type { GradingResult } from '../../../lib/grading';
 
@@ -8,6 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [], warning: '未配置数据库，仅展示本地数据' });
   }
 
+  const userId = await getUserId();
   const { searchParams } = new URL(request.url);
   const sortBy = searchParams.get('sort_by') || 'created_at';
   const order = searchParams.get('order') || 'desc';
@@ -17,6 +19,9 @@ export async function GET(request: NextRequest) {
 
   let query = supabase.from('questions').select('*');
 
+  if (userId) {
+    query = query.eq('user_id', userId);
+  }
   if (filterKp) {
     query = query.eq('knowledge_point', filterKp);
   }
@@ -54,6 +59,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '未配置数据库，无法保存错题' }, { status: 503 });
   }
 
+  const userId = await getUserId();
+
   let body: SaveBody;
   try {
     body = await request.json();
@@ -75,6 +82,7 @@ export async function POST(request: NextRequest) {
     is_correct: g ? g.is_correct : null,
     knowledge_point: g?.knowledge_point || null,
     error_type: g?.error_type || null,
+    user_id: userId,
   };
 
   const { data, error } = await supabase
