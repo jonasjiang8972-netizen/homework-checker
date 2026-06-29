@@ -139,27 +139,27 @@ export default function Home() {
 
       {error && <div style={styles.error}>{error}</div>}
 
-      <div style={styles.uploadArea} onClick={() => !loading && fileRef.current?.click()}>
-        {preview ? (
-          <img src={preview} alt="预览" style={styles.preview} />
-        ) : (
-          <div style={styles.uploadPlaceholder}>
-            <div style={styles.uploadIcon}><IconCamera /></div>
-            <div style={styles.uploadText}>点击拍照或选择图片</div>
-          </div>
+      <form onSubmit={handleSubmit}>
+        <div style={styles.uploadArea} onClick={() => !loading && fileRef.current?.click()}>
+          {preview ? (
+            <img src={preview} alt="预览" style={styles.preview} />
+          ) : (
+            <div style={styles.uploadPlaceholder}>
+              <div style={styles.uploadIcon}><IconCamera /></div>
+              <div style={styles.uploadText}>点击拍照或选择图片</div>
+            </div>
+          )}
+          <input ref={fileRef} type="file" name="image" accept="image/*" capture="environment" onChange={handleFileChange} style={{ display: 'none' }} />
+        </div>
+
+        {!loading && (
+          <button
+            type="submit"
+            disabled={!preview}
+            style={{ ...styles.btn, ...(!preview ? styles.btnDisabled : {}) }}
+          >帮我看看</button>
         )}
-        <input ref={fileRef} type="file" name="image" accept="image/*" capture="environment" onChange={handleFileChange} style={{ display: 'none' }} />
-      </div>
-
-      {!loading && (
-        <button
-          onClick={() => fileRef.current?.form?.requestSubmit()}
-          disabled={!preview}
-          style={{ ...styles.btn, ...(!preview ? styles.btnDisabled : {}) }}
-        >帮我看看</button>
-      )}
-
-      <form onSubmit={handleSubmit} style={{ display: 'none' }} />
+      </form>
 
       {grading && (
         <div style={styles.result}>

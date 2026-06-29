@@ -135,7 +135,7 @@ homework-checker/
 │   ├── TECHNICAL.md          # 技术实现细节
 │   ├── USER_GUIDE.md         # 用户操作手册
 │   ├── DEPLOYMENT.md         # 部署运维指南
-│   ├── v2.4-ROADMAP.md       # v2.4 路线图
+│   ├── v2.5-ROADMAP.md       # v2.5 路线图
 │   └── db-schema-v2.sql      # 数据库结构
 ├── .env.local                 # 环境变量（不提交）
 ├── Dockerfile                 # Docker 构建
@@ -247,7 +247,7 @@ chmod +x setup.sh && ./setup.sh
 | [技术实现文档](docs/TECHNICAL.md) | 逐模块实现细节、容错策略 |
 | [用户操作手册](docs/USER_GUIDE.md) | 使用流程、界面说明、FAQ |
 | [部署运维指南](docs/DEPLOYMENT.md) | 环境变量、建表 SQL、Vercel 部署 |
-| [v2.4 路线图](docs/v2.4-ROADMAP.md) | 用户体系 + 友善语言优化 |
+| [v2.5 路线图](docs/v2.5-ROADMAP.md) | OCR 文字识别 + 邮箱登录 |
 
 ---
 

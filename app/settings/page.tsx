@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { IconSettings, IconLogout } from '../../lib/icons';
+import { IconSettings, IconLogout, IconMail, IconCheck } from '../../lib/icons';
 
 export default function Settings() {
   const { data: session, status } = useSession();
@@ -12,6 +12,13 @@ export default function Settings() {
   const [message, setMessage] = useState('');
   const [defaultSubject, setDefaultSubject] = useState('数学');
   const [defaultModel, setDefaultModel] = useState('claude-3-5-sonnet-latest');
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginCode, setLoginCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -38,6 +45,47 @@ export default function Settings() {
       if (json.defaultSubject) setDefaultSubject(json.defaultSubject);
       if (json.defaultModel) setDefaultModel(json.defaultModel);
     } catch {}
+  };
+
+  const handleSendCode = async () => {
+    if (!loginEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail)) {
+      setLoginError('请输入正确的邮箱地址');
+      return;
+    }
+    setSendingCode(true);
+    setLoginError('');
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail.trim() }),
+      });
+      const json = await res.json();
+      if (json.error) {
+        setLoginError(json.error);
+      } else {
+        setCodeSent(true);
+        setLoginError('');
+      }
+    } catch {
+      setLoginError('发送失败，请稍后重试');
+    }
+    setSendingCode(false);
+  };
+
+  const handleLogin = async () => {
+    if (!loginCode.trim()) return;
+    setLoggingIn(true);
+    setLoginError('');
+    const result = await signIn('email-code', {
+      email: loginEmail.trim(),
+      code: loginCode.trim(),
+      redirect: false,
+    });
+    if (result?.error) {
+      setLoginError('验证码错误或已过期，请重新获取');
+    }
+    setLoggingIn(false);
   };
 
   const handleSaveKey = async () => {
@@ -102,11 +150,54 @@ export default function Settings() {
   if (status === 'unauthenticated') {
     return (
       <div style={styles.page}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>登录</h1>
+        </div>
+
         <div style={styles.card}>
-          <div style={styles.empty}>
-            <div style={styles.emptyIcon}><IconSettings /></div>
-            <p style={styles.emptyText}>登录后才能保存你的设置哦</p>
-            <button onClick={() => signIn('google')} style={styles.primaryBtn}>Google 登录</button>
+          <div style={styles.loginForm}>
+            <input
+              type="email"
+              placeholder="输入邮箱地址"
+              value={loginEmail}
+              onChange={e => { setLoginEmail(e.target.value); setCodeSent(false); setLoginError(''); }}
+              style={styles.loginInput}
+              disabled={codeSent}
+            />
+            {!codeSent ? (
+              <button
+                onClick={handleSendCode}
+                disabled={sendingCode || !loginEmail.trim()}
+                style={{ ...styles.primaryBtn, width: '100%', ...((sendingCode || !loginEmail.trim()) ? styles.btnDisabled : {}) }}
+              >
+                {sendingCode ? '发送中...' : '发送验证码'}
+              </button>
+            ) : (
+              <>
+                <div style={styles.codeSentInfo}><IconCheck /> 验证码已发送到 {loginEmail}</div>
+                <input
+                  type="text"
+                  placeholder="输入6位验证码"
+                  value={loginCode}
+                  onChange={e => setLoginCode(e.target.value)}
+                  style={styles.loginInput}
+                  maxLength={6}
+                />
+                <button
+                  onClick={handleLogin}
+                  disabled={loggingIn || loginCode.length !== 6}
+                  style={{ ...styles.primaryBtn, width: '100%', ...((loggingIn || loginCode.length !== 6) ? styles.btnDisabled : {}) }}
+                >
+                  {loggingIn ? '登录中...' : '登录'}
+                </button>
+                <button
+                  onClick={() => { setCodeSent(false); setLoginCode(''); }}
+                  style={styles.linkBtn}
+                >更换邮箱</button>
+              </>
+            )}
+
+            {loginError && <div style={styles.loginError}>{loginError}</div>}
           </div>
         </div>
       </div>
@@ -203,9 +294,11 @@ const styles: Record<string, React.CSSProperties> = {
   title: { fontSize: '22px', fontWeight: 700, color: '#1a1a2e', margin: 0 },
   logoutBtn: { display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 14px', fontSize: '12px', color: '#8e95a2', background: '#f0f2f5', border: 'none', borderRadius: '8px', cursor: 'pointer' },
   loading: { textAlign: 'center', padding: '40px', color: '#8e95a2' },
-  empty: { textAlign: 'center', padding: '48px 20px' },
-  emptyIcon: { width: '48px', height: '48px', margin: '0 auto 12px', color: '#c0c4cc' },
-  emptyText: { color: '#8e95a2', marginBottom: '16px', fontSize: '14px' },
+  loginForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '8px' },
+  loginInput: { width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', boxSizing: 'border-box' },
+  loginError: { padding: '10px 14px', borderRadius: '8px', background: '#fff5f5', color: '#d63031', fontSize: '12px' },
+  codeSentInfo: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#27ae60', fontWeight: 500 },
+  linkBtn: { background: 'none', border: 'none', color: '#4f6ef7', fontSize: '13px', cursor: 'pointer', padding: 0, textAlign: 'center' },
   userInfo: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4', marginBottom: '16px' },
   avatar: { width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eef1ff', color: '#4f6ef7' },
   avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },

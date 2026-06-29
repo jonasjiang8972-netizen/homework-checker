@@ -62,3 +62,6 @@ export function IconFileText() {
 export function IconClipboard() {
   return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style={s}><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12l2 2 4-4" /></svg>;
 }
+export function IconMail() {
+  return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style={s}><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 4l-10 8L2 4" /></svg>;
+}

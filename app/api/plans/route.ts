@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '暂无薄弱知识点，多批改几道题再来生成计划' }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey, timeout: 60000 });
+  const anthropic = new Anthropic({ apiKey, timeout: 60000, baseURL: process.env.ANTHROPIC_BASE_URL });
 
   try {
     const response = await anthropic.messages.create({

@@ -6,7 +6,33 @@
 
 ---
 
-## [2.4.0] - 2026-06-29
+## [2.5.0] - 2026-06-29
+
+### 🤖 OCR 文字识别 + 邮箱验证码登录
+
+#### 📷 OCR 图片文字识别
+- [x] Tesseract.js 集成，拍照后自动提取图片中的文字
+- [x] 原图保留到 `public/uploads/` 目录，持久化存储供未来视觉模型使用
+- [x] 支持中英文混合识别（`chi_sim+eng`）
+- [x] 图片保存返回 URL，存入错题时附带原图地址
+- [x] 适配文本 API（DeepSeek 兼容接口等），不再依赖视觉模型
+
+#### 📧 邮箱验证码登录（替代 Google Auth）
+- [x] `nodemailer` 集成，支持 QQ邮箱/163邮箱 SMTP
+- [x] 6位验证码，5分钟有效期，用完即销毁
+- [x] 验证码发送接口 `POST /api/auth/send-code`
+- [x] NextAuth CredentialsProvider 验证码校验
+- [x] 设置页登录 UI 替换为邮箱输入+验证码
+
+#### 🔧 技术改进
+- [x] 新增 `lib/ocr.ts` OCR 工具模块
+- [x] 新增 `lib/email.ts` 邮件发送模块
+- [x] 新增 `lib/auth-store.ts` 验证码内存存储
+- [x] Docker 增加 `uploads` 持久化卷挂载
+- [x] 环境变量增加 `SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS`
+- [x] `.env.example` 更新为最新配置项
+
+---
 
 ### 🎨 友善语言 + 全量文档同步
 

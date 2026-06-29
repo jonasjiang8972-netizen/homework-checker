@@ -199,7 +199,7 @@ async function handleGenerate(
     return NextResponse.json({ error: '请指定知识点' }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey, timeout: 60000 });
+  const anthropic = new Anthropic({ apiKey, timeout: 60000, baseURL: process.env.ANTHROPIC_BASE_URL });
 
   try {
     const response = await anthropic.messages.create({
@@ -274,7 +274,7 @@ async function handleSubmit(
     return NextResponse.json({ error: '该测验没有题目' }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey, timeout: 60000 });
+  const anthropic = new Anthropic({ apiKey, timeout: 60000, baseURL: process.env.ANTHROPIC_BASE_URL });
 
   const gradingPrompt = questions.map((q, i) =>
     `第${i + 1}题：${q.question}\n正确答案：${q.answer}\n学生作答：${answers[i] || '（未作答）'}`

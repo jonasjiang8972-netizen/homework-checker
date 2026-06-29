@@ -1,35 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
-import { uploadImage } from '../../../lib/supabase';
 import { retry } from '../../../lib/retry';
 import { getApiKey } from '../../../lib/auth-utils';
-
-type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
-
-function getMimeType(file: File): ImageMediaType {
-  if (file.type && file.type.startsWith('image/')) return file.type as ImageMediaType;
-  const ext = file.name.split('.').pop()?.toLowerCase();
-  if (ext === 'png') return 'image/png';
-  if (ext === 'webp') return 'image/webp';
-  if (ext === 'gif') return 'image/gif';
-  return 'image/jpeg';
-}
-
-const MODEL_MAP: Record<string, string> = {
-  'claude-3-haiku-20240307': 'claude-3-haiku-20240307',
-  'claude-3-5-haiku-latest': 'claude-3-5-haiku-latest',
-  'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-latest',
-  'claude-3-opus-20240229': 'claude-3-opus-20240229',
-};
+import { ocrImage } from '../../../lib/ocr';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import crypto from 'node:crypto';
 
 const DEFAULT_MODEL = 'claude-3-5-sonnet-latest';
-const TIMEOUT_MS = 30000;
+const TIMEOUT_MS = 60000;
 
-async function callAnthropic(
+async function callAnthropicText(
   anthropic: Anthropic,
-  base64: string,
-  mediaType: ImageMediaType,
+  ocrText: string,
   model: string
 ): Promise<string> {
   const response = await anthropic.messages.create({
@@ -40,8 +24,8 @@ async function callAnthropic(
       role: 'user',
       content: [
         {
-          type: 'image',
-          source: { type: 'base64', media_type: mediaType, data: base64 },
+          type: 'text',
+          text: `以下是从学生作业图片中通过OCR提取的题目文字，可能存在识别错误，请根据文字内容批改：\n\n---\n${ocrText}\n---`,
         },
         { type: 'text', text: GRADING_PROMPT },
       ],
@@ -76,18 +60,39 @@ export async function POST(request: NextRequest) {
   const requestedModel = formData.get('model') as string | null;
   const model = MODEL_MAP[requestedModel || process.env.ANTHROPIC_MODEL || ''] || DEFAULT_MODEL;
 
-  const bytes = await image.arrayBuffer();
-  const base64 = Buffer.from(bytes).toString('base64');
-  const mediaType = getMimeType(image);
+  const bytes = Buffer.from(await image.arrayBuffer());
 
-  const anthropic = new Anthropic({ apiKey, timeout: TIMEOUT_MS });
+  let imageUrl: string | null = null;
+  try {
+    const uploadsDir = join(process.cwd(), 'public', 'uploads');
+    await mkdir(uploadsDir, { recursive: true });
+    const ext = image.name.split('.').pop() || 'jpg';
+    const filename = `${crypto.randomUUID()}.${ext}`;
+    await writeFile(join(uploadsDir, filename), bytes);
+    imageUrl = `/uploads/${filename}`;
+  } catch {
+    // image save failed, continue without it
+  }
+
+  let ocrText = '';
+  try {
+    ocrText = await ocrImage(bytes);
+  } catch {
+    return NextResponse.json({ error: '图片文字识别失败，请确保图片清晰' }, { status: 422 });
+  }
+
+  if (!ocrText) {
+    return NextResponse.json({ error: '未能从图片中识别到文字，请确保图片包含清晰题目' }, { status: 422 });
+  }
+
+  const anthropic = new Anthropic({ apiKey, timeout: TIMEOUT_MS, baseURL: process.env.ANTHROPIC_BASE_URL });
 
   try {
     let raw = '';
     
     try {
       raw = await retry(
-        () => callAnthropic(anthropic, base64, mediaType, model),
+        () => callAnthropicText(anthropic, ocrText, model),
         {
           maxRetries: 2,
           delayMs: 1500,
@@ -114,7 +119,7 @@ export async function POST(request: NextRequest) {
     const grading = parseGrading(raw);
     const processingTime = Date.now() - startTime;
 
-    return NextResponse.json({ grading, imageUrl: null, processingTime });
+    return NextResponse.json({ grading, imageUrl, processingTime });
   } catch (error) {
     const msg = error instanceof Error ? error.message : '未知错误';
     return NextResponse.json(
@@ -123,3 +128,21 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+
+function getMimeType(file: File): ImageMediaType {
+  if (file.type && file.type.startsWith('image/')) return file.type as ImageMediaType;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'gif') return 'image/gif';
+  return 'image/jpeg';
+}
+
+const MODEL_MAP: Record<string, string> = {
+  'claude-3-haiku-20240307': 'claude-3-haiku-20240307',
+  'claude-3-5-haiku-latest': 'claude-3-5-haiku-latest',
+  'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-latest',
+  'claude-3-opus-20240229': 'claude-3-opus-20240229',
+};
