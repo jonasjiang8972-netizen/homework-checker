@@ -4,7 +4,7 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -24,6 +24,9 @@
 | 📝 **智能测验** | 针对薄弱知识点生成同类题目进行测验 | ✅ 已实现 |
 | 💾 **错题本** | 自动归档错题，支持分类与回放 | ✅ 已实现 |
 | 🔐 **用户登录** | Google OAuth 一键登录 | ✅ 已实现 |
+| 📝 **Markdown 渲染** | 公式/列表/代码块美化渲染 | 🚧 开发中 |
+| 🔀 **多学科支持** | 数学/语文/英语多学科切换 | 🚧 开发中 |
+| 🔄 **错题重做** | 重做错题并对照正确答案 | ✅ 已实现 |
 
 ---
 
