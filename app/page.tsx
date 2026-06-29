@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import type { GradingResult } from '../lib/grading';
 import { ModelSelector } from './components/ModelSelector';
+import { MarkdownRenderer } from '../lib/markdown-renderer';
 
 export default function Home() {
   const [grading, setGrading] = useState<GradingResult | null>(null);
@@ -215,13 +216,13 @@ export default function Home() {
               <Field label="知识点" value={grading.knowledge_point} tag />
             )}
             {grading.error_spot && !grading.is_correct && (
-              <Field label="🔍 错误之处" value={grading.error_spot} />
+              <Field label="🔍 错误之处" value={grading.error_spot} md />
             )}
             {grading.correct_solution && (
-              <Field label="✏️ 正确解答" value={grading.correct_solution} pre />
+              <Field label="✏️ 正确解答" value={grading.correct_solution} md />
             )}
             {grading.analysis && (
-              <Field label="💡 错因分析" value={grading.analysis} />
+              <Field label="💡 错因分析" value={grading.analysis} md />
             )}
             {grading.knowledge_tags.length > 0 && (
               <div style={styles.field}>
@@ -250,12 +251,14 @@ export default function Home() {
   );
 }
 
-function Field({ label, value, tag, pre }: { label: string; value: string; tag?: boolean; pre?: boolean }) {
+function Field({ label, value, tag, pre, md }: { label: string; value: string; tag?: boolean; pre?: boolean; md?: boolean }) {
   return (
     <div style={styles.field}>
       <div style={styles.fieldLabel}>{label}</div>
       {tag ? (
         <span style={styles.tag}>{value}</span>
+      ) : md ? (
+        <MarkdownRenderer content={value} />
       ) : (
         <div style={pre ? styles.fieldPre : styles.fieldText}>{value}</div>
       )}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { marked } from 'marked';
+import { MarkdownRenderer } from '../../lib/markdown-renderer';
 
 interface GradingResult {
   is_correct: boolean;
@@ -78,15 +78,6 @@ export default function History() {
     () => filterSubject === '全部' ? questions : questions.filter(q => q.subject === filterSubject),
     [questions, filterSubject],
   );
-
-  const renderMarkdown = (text: string) => {
-    if (!text) return '';
-    try {
-      return marked.parse(text, { async: false }) as string;
-    } catch {
-      return text;
-    }
-  };
 
   return (
     <div style={styles.page}>
@@ -187,11 +178,7 @@ export default function History() {
                     {q.error_analysis && (
                       <>
                         <div style={styles.analysisHeader}>💡 错因分析</div>
-                        <div
-                          className="markdown-body"
-                          style={styles.analysisContent}
-                          dangerouslySetInnerHTML={{ __html: renderMarkdown(q.error_analysis) }}
-                        />
+                        <MarkdownRenderer content={q.error_analysis} />
                       </>
                     )}
                     {!q.image_url && !q.error_analysis && (

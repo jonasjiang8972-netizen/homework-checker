@@ -17,6 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh">
+      <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css" />
+      </head>
       <body style={{ margin: 0, padding: 0, background: '#f5f7fa' }}>
         {children}
       </body>
