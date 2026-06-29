@@ -2,15 +2,19 @@
 
 import { useState, useRef } from 'react';
 import type { GradingResult } from '../lib/grading';
+import { ModelSelector } from './components/ModelSelector';
+import { MobileDetector } from './components/MobileDetector';
 
 export default function Home() {
   const [grading, setGrading] = useState<GradingResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
   const [saved, setSaved] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const compressImage = (file: File): Promise<File> => {
@@ -56,32 +60,58 @@ export default function Home() {
     const rawFile = fileInput.files?.[0];
     if (!rawFile) return;
 
+    setRetryCount(0);
     setLoading(true);
     setGrading(null);
     setError('');
     setSaved(false);
     startTimer();
 
+    const steps = ['🔄 正在压缩图片...', '📤 正在上传图片...', '🧠 AI 正在批改...'];
+    let stepIndex = 0;
+
+    const showLoadingStep = () => {
+      if (stepIndex < steps.length) {
+        setLoadingDetail(steps[stepIndex]);
+        stepIndex++;
+      }
+    };
+
+    showLoadingStep();
+
     try {
       const compressed = await compressImage(rawFile);
+      showLoadingStep();
+      
       const formData = new FormData();
       formData.append('image', compressed);
 
       const response = await fetch('/api/correct', { method: 'POST', body: formData });
       const data = await response.json();
+      
       if (data.error) {
         setError(data.error);
+        setRetryCount(prev => prev + 1);
+        if (retryCount < 2 && data.retryCount !== undefined) {
+          setLoadingDetail(`⚠️ 重试中 (${retryCount + 1}/3)...`);
+          setTimeout(() => handleSubmit(e), 1500);
+          return;
+        }
       } else if (data.grading) {
         setGrading(data.grading);
         setImageUrl(data.imageUrl || null);
+        setLoadingDetail('✅ 批改完成');
       } else {
         setError('未返回批改结果');
       }
-    } catch {
+    } catch (err) {
       setError('网络错误，请重试');
+      setRetryCount(prev => prev + 1);
+    } finally {
+      stopTimer();
+      setLoading(false);
+      setLoadingDetail('');
     }
-    stopTimer();
-    setLoading(false);
   };
 
   const handleSave = async () => {
@@ -120,6 +150,12 @@ export default function Home() {
           <h1 style={styles.title}>错题批改助手</h1>
           <p style={styles.subtitle}>拍照上传题目，AI 立即批改并分析错因</p>
         </header>
+
+        <div style={styles.modelSelector}>
+          <ModelSelector />
+        </div>
+
+        <MobileDetector />
 
         <nav style={styles.nav}>
           <a href="/history" style={styles.navLink}>📋 错题本</a>
@@ -260,4 +296,5 @@ const styles: Record<string, React.CSSProperties> = {
   tag: { fontSize: '12px', padding: '3px 10px', borderRadius: '8px', background: '#eef1ff', color: '#667eea', fontWeight: 500 },
   saveBtn: { marginTop: '6px', width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#667eea', background: 'white', border: '1px solid #667eea', borderRadius: '10px', cursor: 'pointer' },
   savedBtn: { color: '#27ae60', borderColor: '#27ae60', cursor: 'default' },
+  modelSelector: { marginBottom: '20px' },
 };

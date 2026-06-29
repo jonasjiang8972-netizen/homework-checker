@@ -88,12 +88,32 @@ create table if not exists questions (
   created_at timestamptz default now()
 );
 
--- 按 ID 查询优化
-create index if not exists idx_questions_created_at
-  on questions (created_at desc);
+-- 批改记录表（v2.1 新增）
+create table if not exists batch_grading_data (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid,
+  question_id uuid,
+  image_url text,
+  ocr_text text,
+  ocr_confidence float,
+  grading_result jsonb,
+  model_version text,
+  processing_time_ms integer,
+  file_size integer,
+  created_at timestamptz default now()
+);
 
--- 行级安全（RLS）：登录用户只能管自己的数据（可选，配合 NextAuth user.id）
--- alter table questions enable row level security;
+-- 按时间查询优化
+create index if not exists idx_batch_grading_created_at
+  on batch_grading_data (created_at desc);
+
+-- 按学生查询优化
+create index if not exists idx_batch_grading_student_id
+  on batch_grading_data (student_id);
+
+-- 按模型版本查询优化
+create index if not exists idx_batch_grading_model_version
+  on batch_grading_data (model_version);
 ```
 
 > NextAuth 的 `@auth/supabase-adapter` 首次登录会自动建 `users/accounts/sessions/verification_tokens` 表（Supabase 需开启对应 schema，参考 adapter 文档）。

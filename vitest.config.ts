@@ -1,0 +1,11 @@
+export default {
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['../__tests__/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+    },
+  },
+};

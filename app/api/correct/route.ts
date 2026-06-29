@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
 import { uploadImage } from '../../../lib/supabase';
+import { retry } from '../../../lib/retry';
 
 type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
 
@@ -9,11 +10,51 @@ function getMimeType(file: File): ImageMediaType {
   if (file.type && file.type.startsWith('image/')) return file.type as ImageMediaType;
   const ext = file.name.split('.').pop()?.toLowerCase();
   if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'gif') return 'image/gif';
   return 'image/jpeg';
 }
 
+const MODEL_MAP: Record<string, string> = {
+  'claude-3-haiku-20240307': 'claude-3-haiku-20240307',
+  'claude-3-5-haiku-latest': 'claude-3-5-haiku-latest',
+  'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-latest',
+  'claude-3-opus-20240229': 'claude-3-opus-20240229',
+};
+
+const DEFAULT_MODEL = 'claude-3-5-sonnet-latest';
+const TIMEOUT_MS = 30000;
+
+async function callAnthropic(
+  anthropic: Anthropic,
+  base64: string,
+  mediaType: ImageMediaType,
+  model: string
+): Promise<string> {
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: 2000,
+    temperature: 0.2,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'image',
+          source: { type: 'base64', media_type: mediaType, data: base64 },
+        },
+        { type: 'text', text: GRADING_PROMPT },
+      ],
+    }],
+  });
+
+  const textBlock = response.content.find(c => c.type === 'text');
+  return (textBlock && 'text' in textBlock) ? textBlock.text : '';
+}
+
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  
   if (!apiKey || apiKey.startsWith('your_')) {
     return NextResponse.json(
       { error: '未配置 Claude API Key，请在 .env.local 填写 ANTHROPIC_API_KEY' },
@@ -33,38 +74,47 @@ export async function POST(request: NextRequest) {
   const bytes = await image.arrayBuffer();
   const base64 = Buffer.from(bytes).toString('base64');
   const mediaType = getMimeType(image);
+  const model = MODEL_MAP[process.env.ANTHROPIC_MODEL || ''] || DEFAULT_MODEL;
 
-  const anthropic = new Anthropic({ apiKey, timeout: 30000 });
+  const anthropic = new Anthropic({ apiKey, timeout: TIMEOUT_MS });
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64 },
+    let raw = '';
+    
+    try {
+      raw = await retry(
+        () => callAnthropic(anthropic, base64, mediaType, model),
+        {
+          maxRetries: 2,
+          delayMs: 1500,
+          onRetry: (attempt, error) => {
+            console.log(`Attempt ${attempt} failed: ${error.message}`);
           },
-          { type: 'text', text: GRADING_PROMPT },
-        ],
-      }],
-    });
+        }
+      );
+    } catch (retryError) {
+      if (retryError instanceof Error && 
+          (retryError.message.includes('timeout') || retryError.message.includes('timed out'))) {
+        return NextResponse.json(
+          { 
+            error: '批改超时，请重试。如果问题持续，请检查网络或稍后重试',
+            retryCount: 2,
+            lastError: retryError.message
+          },
+          { status: 504 }
+        );
+      }
+      throw retryError;
+    }
 
-    const textBlock = response.content.find(c => c.type === 'text');
-    const raw = textBlock && 'text' in textBlock ? textBlock.text : '';
     const grading = parseGrading(raw);
+    const processingTime = Date.now() - startTime;
 
-    const imageBuffer = Buffer.from(bytes);
-    const imageUrl = await uploadImage(imageBuffer, image.name, mediaType);
-
-    return NextResponse.json({ grading, imageUrl });
+    return NextResponse.json({ grading, imageUrl: null, processingTime });
   } catch (error) {
     const msg = error instanceof Error ? error.message : '未知错误';
-    const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('timed out');
     return NextResponse.json(
-      { error: isTimeout ? '批改超时，请重试' : '批改服务暂时不可用，请稍后再试' },
+      { error: '批改服务暂时不可用，请稍后再试' },
       { status: 502 }
     );
   }
