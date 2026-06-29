@@ -6,6 +6,38 @@
 
 ---
 
+## [2.1.0] - 2026-06-29
+
+### 🚀 体验优化与基础设施
+
+#### ✨ 新增功能
+
+- **AI 模型选择器**：首页顶部可选 Claude 3 Haiku/3.5 Haiku/3.5 Sonnet/Opus 模型
+- **前后端模型联动**：前端选择的模型直接传递到批改接口，即时生效
+- **批改重试机制**：超时或其他暂时性错误时自动重试 3 次
+- **批改进度细化**：显示「压缩中→上传中→AI 批改中」分步状态
+- **API 调用重试**：客户端 3 次重试 + 服务端 2 次自动重试
+
+#### 🔧 技术改进
+
+- **类型安全**：修复 `retry.ts` 类型错误（`maxRetries` 为 undefined、`error.status` 不存在）
+- **构建修复**：修复 `data-recycler.ts` 在服务端模块中使用 React hooks 的构建失败
+- **测试覆盖**：12 个掌握度算法单元测试，覆盖边缘情况（边界值、衰减、空输入）
+- **CI 集成**：GitHub Actions 自动运行 lint + typecheck + test + build
+- **TypeScript 升级**：`target` 从 `es5` 升级至 `es2017`，消除废弃警告
+- **sharp 依赖移除**：用原生 Buffer 处理替代原生模块，减少依赖复杂度
+- **vitest 配置修复**：修复错误的 `include` 路径
+
+#### 📚 文档完善
+
+- `docs/FUTURE-ROADMAP.md`：长期技术愿景
+- `docs/v2.2-ROADMAP.md`：v2.2 迭代规划
+- `.github/workflows/ci.yml`：CI 工作流文档化
+- `docs/TECHNICAL.md`：新增重试机制和模型选择说明
+- `docs/DEPLOYMENT.md`：新增多模型环境变量文档
+
+---
+
 ## [2.0.0] - 2026-06-29
 
 ### 🎉 重大升级：学习闭环系统

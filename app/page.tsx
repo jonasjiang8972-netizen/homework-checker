@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react';
 import type { GradingResult } from '../lib/grading';
 import { ModelSelector } from './components/ModelSelector';
-import { MobileDetector } from './components/MobileDetector';
 
 export default function Home() {
   const [grading, setGrading] = useState<GradingResult | null>(null);
@@ -85,6 +84,8 @@ export default function Home() {
       
       const formData = new FormData();
       formData.append('image', compressed);
+      const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
+      if (savedModel) formData.append('model', savedModel);
 
       const response = await fetch('/api/correct', { method: 'POST', body: formData });
       const data = await response.json();
@@ -154,8 +155,6 @@ export default function Home() {
         <div style={styles.modelSelector}>
           <ModelSelector />
         </div>
-
-        <MobileDetector />
 
         <nav style={styles.nav}>
           <a href="/history" style={styles.navLink}>📋 错题本</a>

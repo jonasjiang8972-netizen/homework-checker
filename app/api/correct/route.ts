@@ -71,10 +71,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '图片过大，请小于 10MB' }, { status: 413 });
   }
 
+  const requestedModel = formData.get('model') as string | null;
+  const model = MODEL_MAP[requestedModel || process.env.ANTHROPIC_MODEL || ''] || DEFAULT_MODEL;
+
   const bytes = await image.arrayBuffer();
   const base64 = Buffer.from(bytes).toString('base64');
   const mediaType = getMimeType(image);
-  const model = MODEL_MAP[process.env.ANTHROPIC_MODEL || ''] || DEFAULT_MODEL;
 
   const anthropic = new Anthropic({ apiKey, timeout: TIMEOUT_MS });
 
