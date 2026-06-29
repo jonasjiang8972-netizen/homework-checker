@@ -1,9 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
+import { uploadImage } from '../../../lib/supabase';
 
-function getMimeType(file: File): string {
-  if (file.type && file.type.startsWith('image/')) return file.type;
+type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+
+function getMimeType(file: File): ImageMediaType {
+  if (file.type && file.type.startsWith('image/')) return file.type as ImageMediaType;
   const ext = file.name.split('.').pop()?.toLowerCase();
   if (ext === 'png') return 'image/png';
   return 'image/jpeg';
@@ -53,7 +56,10 @@ export async function POST(request: NextRequest) {
     const raw = textBlock && 'text' in textBlock ? textBlock.text : '';
     const grading = parseGrading(raw);
 
-    return NextResponse.json({ grading });
+    const imageBuffer = Buffer.from(bytes);
+    const imageUrl = await uploadImage(imageBuffer, image.name, mediaType);
+
+    return NextResponse.json({ grading, imageUrl });
   } catch (error) {
     const msg = error instanceof Error ? error.message : '未知错误';
     const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('timed out');

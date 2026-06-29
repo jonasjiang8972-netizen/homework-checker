@@ -10,6 +10,7 @@ export default function Home() {
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
   const [saved, setSaved] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const compressImage = (file: File): Promise<File> => {
@@ -72,6 +73,7 @@ export default function Home() {
         setError(data.error);
       } else if (data.grading) {
         setGrading(data.grading);
+        setImageUrl(data.imageUrl || null);
       } else {
         setError('未返回批改结果');
       }
@@ -93,7 +95,7 @@ export default function Home() {
           question: grading.knowledge_point || '（图片题目）',
           errorAnalysis: grading.analysis,
           subject: '数学',
-          imageUrl: '',
+          imageUrl: imageUrl || '',
           grading,
         }),
       });
@@ -122,6 +124,8 @@ export default function Home() {
         <nav style={styles.nav}>
           <a href="/history" style={styles.navLink}>📋 错题本</a>
           <a href="/dashboard" style={styles.navLink}>📊 掌握度</a>
+          <a href="/plans" style={styles.navLink}>📋 学习计划</a>
+          <a href="/quiz" style={styles.navLink}>📝 测验</a>
           <a href="/api/auth/signin" style={styles.navLink}>🔗 登录</a>
         </nav>
 

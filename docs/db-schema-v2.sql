@@ -68,3 +68,11 @@ create index if not exists idx_questions_kp on questions(knowledge_point);
 -- alter table test_records enable row level security;
 -- create policy "own data read" on knowledge_points for select using (auth.uid() = user_id);
 -- create policy "own data write" on knowledge_points for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ============================================================
+-- 5. Storage 存储桶（Supabase Dashboard → Storage → New Bucket）
+-- 名称: question-images
+-- 公开访问: ON（勾选 public bucket）
+-- 文件大小限制: 10MB
+-- 允许 MIME: image/png, image/jpeg, image/gif, image/webp
+-- ============================================================
