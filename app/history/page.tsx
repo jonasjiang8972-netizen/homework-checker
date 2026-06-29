@@ -200,22 +200,25 @@ export default function History() {
                   </div>
                 )}
 
-                {q.knowledge_point && (
-                  <div style={styles.actions}>
+                <div style={styles.actions}>
+                  <a href={`/redo/${q.id}`} style={styles.redoBtn}>
+                    🔄 重做此题
+                  </a>
+                  {q.knowledge_point && (
                     <a
                       href={`/quiz?kp=${encodeURIComponent(q.knowledge_point)}`}
-                      style={styles.redoBtn}
+                      style={{ ...styles.redoBtn, background: '#27ae60' }}
                     >
-                      🔄 重做同类题
+                      📝 同类题测验
                     </a>
-                    <button
-                      onClick={() => setExpanded(expanded === q.id ? null : q.id)}
-                      style={styles.expandBtn}
-                    >
-                      {expanded === q.id ? '收起' : '展开错因'}
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => setExpanded(expanded === q.id ? null : q.id)}
+                    style={styles.expandBtn}
+                  >
+                    {expanded === q.id ? '收起' : '展开错因'}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
