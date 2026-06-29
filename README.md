@@ -24,15 +24,45 @@
 | 📝 **智能测验** | 针对薄弱知识点生成同类题目进行测验 | ✅ 已实现 |
 | 💾 **错题本** | 自动归档错题，支持分类与回放 | ✅ 已实现 |
 | 🔐 **用户登录** | Google OAuth 一键登录 | ✅ 已实现 |
-| 📝 **Markdown 渲染** | 公式/列表/代码块美化渲染 | 🚧 开发中 |
-| 🔀 **多学科支持** | 数学/语文/英语多学科切换 | 🚧 开发中 |
+| 🖼️ **Markdown 渲染** | 公式/列表/代码块美化渲染 | ✅ 已实现 |
+| 🔀 **多学科支持** | 数学/语文/英语多学科切换 | ✅ 已实现 |
 | 🔄 **错题重做** | 重做错题并对照正确答案 | ✅ 已实现 |
+| 🐳 **Docker 部署** | 一键 Docker Compose 启动 | ✅ 已实现 |
 
 ---
 
 ## 🚀 快速开始
 
-### 本地开发
+### 方式一：一键安装（推荐）
+
+```bash
+chmod +x setup.sh && ./setup.sh
+```
+
+脚本自动检测 Docker 或 Node.js 环境，引导完成配置和启动。
+
+### 方式二：Docker 部署
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/jonasjiang8972-netizen/homework-checker.git
+cd homework-checker
+
+# 2. 配置环境变量
+cp .env.example .env.local
+# 编辑 .env.local，填入你的 API 密钥（见下文）
+
+# 3. 启动
+docker compose up -d
+# 访问 http://localhost:3000
+
+# 查看日志
+docker compose logs -f
+# 停止服务
+docker compose down
+```
+
+### 方式三：本地开发
 
 ```bash
 # 1. 克隆项目
@@ -107,6 +137,10 @@ homework-checker/
 │   ├── v2.0-ROADMAP.md       # v2.0 路线图
 │   └── db-schema-v2.sql      # 数据库结构
 ├── .env.local                 # 环境变量（不提交）
+├── Dockerfile                 # Docker 构建
+├── docker-compose.yml         # Docker Compose 编排
+├── setup.sh                   # 一键安装脚本
+├── .dockerignore
 ├── package.json
 ├── next.config.js
 └── tsconfig.json
@@ -186,7 +220,13 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 ## 🚢 部署指南
 
-### Vercel 一键部署
+### Docker 一键部署（推荐）
+
+```bash
+chmod +x setup.sh && ./setup.sh
+```
+
+### Vercel 部署
 
 1. [Fork](https://github.com/jonasjiang8972-netizen/homework-checker/fork) 本项目
 2. [Vercel](https://vercel.com) → Import Project → 选择仓库

@@ -128,7 +128,41 @@ with check (auth.uid() = user_id);
 
 ---
 
-## 5. 部署到 Vercel
+## 5. Docker 部署
+
+### 5.1 项目自带 Docker 支持
+
+```bash
+# 一键安装
+chmod +x setup.sh && ./setup.sh
+
+# 或手动执行
+cp .env.example .env.local   # 编辑填入真实密钥
+docker compose up -d          # 后台启动
+# 访问 http://localhost:3000
+```
+
+### 5.2 环境变量
+
+Docker 模式下环境变量通过 `.env.local` 传入容器，与外挂模式共享同一配置。无需额外配置。
+
+### 5.3 常用命令
+
+| 命令 | 说明 |
+|------|------|
+| `docker compose up -d` | 后台启动 |
+| `docker compose logs -f` | 跟踪日志 |
+| `docker compose down` | 停止服务 |
+| `docker compose build --no-cache` | 强制重新构建 |
+| `docker compose restart` | 重启服务 |
+
+### 5.4 健康检查
+
+docker-compose.yml 已配置 healthcheck，每 30s 检测 `localhost:3000` 可用性，可通过 `docker compose ps` 查看状态。
+
+---
+
+## 6. 部署到 Vercel
 
 1. 代码推到 GitLab（或 GitHub，Vercel 均支持）：
    ```bash
@@ -149,7 +183,7 @@ with check (auth.uid() = user_id);
 
 ---
 
-## 6. 运维与监控
+## 7. 运维与监控
 
 | 事项 | 现状 | 建议 |
 |------|------|------|
@@ -161,20 +195,21 @@ with check (auth.uid() = user_id);
 
 ---
 
-## 7. 部署检查清单
+## 8. 部署检查清单
 
 上线前逐项确认：
 - [ ] `.env.local` / Vercel 环境变量全部填写真实值
 - [ ] Supabase `questions` 表已建
 - [ ] Google OAuth 回调地址含生产域名
 - [ ] `NEXTAUTH_URL` / `NEXTAUTH_SECRET` 已设
+- [ ] Docker 构建验证：`docker compose build` 无报错
 - [ ] 零配置降级测试：清空变量后 `npm run dev` 不崩溃
 - [ ] 真实流程测试：拍一道题 → 批改 → 存档 → 错题本可见
 - [ ] 手机浏览器访问生产域名验证移动适配
 
 ---
 
-## 8. 故障排查
+## 9. 故障排查
 
 | 症状 | 排查方向 |
 |------|----------|
