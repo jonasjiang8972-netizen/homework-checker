@@ -14,16 +14,21 @@ export default function Dashboard() {
   const [stats, setStats] = useState<KnowledgePointStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [subject, setSubject] = useState('全部');
+  const [subjects, setSubjects] = useState<string[]>(['全部']);
 
   useEffect(() => {
     fetchStats();
+    fetchSubjects();
   }, []);
 
-  const fetchStats = async () => {
+  const fetchStats = async (sub?: string) => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/stats');
+      const params = new URLSearchParams();
+      if (sub && sub !== '全部') params.set('subject', sub);
+      const res = await fetch(`/api/stats?${params}`);
       const json = await res.json();
       if (json.error) {
         setError(json.error);
@@ -35,6 +40,23 @@ export default function Dashboard() {
       setError('加载失败');
     }
     setLoading(false);
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      const res = await fetch('/api/questions?sort_by=subject');
+      const json = await res.json();
+      if (json.data) {
+        const set = new Set<string>();
+        (json.data as any[]).forEach((q: any) => { if (q.subject && q.subject !== '未分类') set.add(q.subject); });
+        setSubjects(['全部', ...Array.from(set)]);
+      }
+    } catch {}
+  };
+
+  const handleSubjectChange = (sub: string) => {
+    setSubject(sub);
+    fetchStats(sub);
   };
 
   const masteryColor = (level: number) => {
@@ -54,6 +76,23 @@ export default function Dashboard() {
           <div style={{ width: '60px' }} />
         </header>
 
+        {subjects.length > 1 && (
+          <div style={styles.subjectBar}>
+            {subjects.map(s => (
+              <button
+                key={s}
+                onClick={() => handleSubjectChange(s)}
+                style={{
+                  ...styles.subjectBtn,
+                  ...(subject === s ? styles.subjectBtnActive : {}),
+                }}
+              >
+                {s === '全部' ? '📋 全部' : s}
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div style={styles.skeletonList}>
             {[0, 1, 2].map(i => <div key={i} style={styles.skeletonItem} />)}
@@ -62,7 +101,7 @@ export default function Dashboard() {
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>⚠️</div>
             <p style={styles.emptyText}>{error}</p>
-            <button onClick={fetchStats} style={styles.retryBtn}>重试</button>
+            <button onClick={() => fetchStats()} style={styles.retryBtn}>重试</button>
           </div>
         ) : stats.length === 0 ? (
           <div style={styles.emptyState}>
@@ -125,9 +164,17 @@ export default function Dashboard() {
 const styles: Record<string, React.CSSProperties> = {
   page: { minHeight: '100vh', padding: '20px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
   card: { maxWidth: '480px', margin: '0 auto', background: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' },
   backLink: { color: '#667eea', textDecoration: 'none', fontSize: '14px', width: '60px' },
   title: { fontSize: '20px', fontWeight: 700, color: '#1a1a2e', margin: 0 },
+  subjectBar: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' },
+  subjectBtn: {
+    padding: '6px 14px', fontSize: '13px', fontWeight: 500, color: '#666',
+    background: '#f0f0f0', border: 'none', borderRadius: '20px', cursor: 'pointer',
+  },
+  subjectBtnActive: {
+    color: 'white', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  },
   skeletonList: { display: 'flex', flexDirection: 'column', gap: '12px' },
   skeletonItem: { height: '72px', borderRadius: '14px', background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)', backgroundSize: '800px 100%', animation: 'shimmer 1.5s infinite linear' },
   emptyState: { textAlign: 'center', padding: '40px 20px' },

@@ -15,6 +15,7 @@ export default function Home() {
   const [saved, setSaved] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [subject, setSubject] = useState('数学');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const compressImage = (file: File): Promise<File> => {
@@ -126,7 +127,7 @@ export default function Home() {
         body: JSON.stringify({
           question: grading.knowledge_point || '（图片题目）',
           errorAnalysis: grading.analysis,
-          subject: '数学',
+          subject,
           imageUrl: imageUrl || '',
           grading,
         }),
@@ -155,6 +156,22 @@ export default function Home() {
 
         <div style={styles.modelSelector}>
           <ModelSelector />
+        </div>
+
+        <div style={styles.subjectRow}>
+          <span style={styles.subjectLabel}>学科：</span>
+          {['数学', '语文', '英语', '其他'].map(s => (
+            <button
+              key={s}
+              onClick={() => setSubject(s)}
+              style={{
+                ...styles.subjectBtn,
+                ...(subject === s ? styles.subjectBtnActive : {}),
+              }}
+            >
+              {s}
+            </button>
+          ))}
         </div>
 
         <nav style={styles.nav}>
@@ -298,5 +315,14 @@ const styles: Record<string, React.CSSProperties> = {
   tag: { fontSize: '12px', padding: '3px 10px', borderRadius: '8px', background: '#eef1ff', color: '#667eea', fontWeight: 500 },
   saveBtn: { marginTop: '6px', width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#667eea', background: 'white', border: '1px solid #667eea', borderRadius: '10px', cursor: 'pointer' },
   savedBtn: { color: '#27ae60', borderColor: '#27ae60', cursor: 'default' },
-  modelSelector: { marginBottom: '20px' },
+  modelSelector: { marginBottom: '12px' },
+  subjectRow: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' },
+  subjectLabel: { fontSize: '13px', fontWeight: 500, color: '#666', whiteSpace: 'nowrap' },
+  subjectBtn: {
+    flex: 1, padding: '7px 0', fontSize: '13px', fontWeight: 500, color: '#666',
+    background: '#f0f0f0', border: 'none', borderRadius: '10px', cursor: 'pointer',
+  },
+  subjectBtnActive: {
+    color: 'white', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  },
 };

@@ -39,16 +39,28 @@ export default function History() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState('');
   const [filterSubject, setFilterSubject] = useState('全部');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [filterError, setFilterError] = useState('all');
 
   useEffect(() => {
     fetchQuestions();
-  }, []);
+  }, [sortBy, sortOrder, filterSubject, filterError]);
+
+  const buildQuery = () => {
+    const params = new URLSearchParams();
+    params.set('sort_by', sortBy);
+    params.set('order', sortOrder);
+    if (filterSubject !== '全部') params.set('filter_subject', filterSubject);
+    if (filterError !== 'all') params.set('filter_error', filterError);
+    return params.toString();
+  };
 
   const fetchQuestions = async () => {
     setLoading(true);
     setFetchError('');
     try {
-      const res = await fetch('/api/questions');
+      const res = await fetch(`/api/questions?${buildQuery()}`);
       const json = await res.json();
       if (json.error) {
         setFetchError(json.error);
@@ -73,11 +85,6 @@ export default function History() {
     questions.forEach(q => { if (q.subject) set.add(q.subject); });
     return ['全部', ...Array.from(set)];
   }, [questions]);
-
-  const filtered = useMemo(
-    () => filterSubject === '全部' ? questions : questions.filter(q => q.subject === filterSubject),
-    [questions, filterSubject],
-  );
 
   return (
     <div style={styles.page}>
@@ -110,6 +117,35 @@ export default function History() {
           </div>
         )}
 
+        {!loading && !fetchError && questions.length > 0 && (
+          <div style={styles.sortBar}>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              style={styles.sortSelect}
+            >
+              <option value="created_at">按时间</option>
+              <option value="knowledge_point">按知识点</option>
+              <option value="subject">按学科</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+              style={styles.sortDirBtn}
+            >
+              {sortOrder === 'desc' ? '↓ 最新' : '↑ 最早'}
+            </button>
+            <select
+              value={filterError}
+              onChange={e => setFilterError(e.target.value)}
+              style={{ ...styles.sortSelect, flex: 1 }}
+            >
+              <option value="all">全部状态</option>
+              <option value="correct">✅ 已掌握</option>
+              <option value="wrong">❌ 有错误</option>
+            </select>
+          </div>
+        )}
+
         {loading ? (
           <div style={styles.skeletonList}>
             {[0, 1, 2].map((i) => <div key={i} style={styles.skeletonItem} />)}
@@ -126,15 +162,15 @@ export default function History() {
             <p style={styles.emptyText}>暂无错题记录</p>
             <a href="/" style={styles.emptyBtn}>去添加第一道错题</a>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : questions.length === 0 ? (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>🔍</div>
-            <p style={styles.emptyText}>该学科暂无错题</p>
-            <button onClick={() => setFilterSubject('全部')} style={styles.retryBtn}>查看全部</button>
+            <p style={styles.emptyText}>没有符合条件的错题</p>
+            <button onClick={() => { setFilterSubject('全部'); setFilterError('all'); }} style={styles.retryBtn}>清除筛选</button>
           </div>
         ) : (
           <ul style={styles.list}>
-            {filtered.map((q) => (
+            {questions.map((q) => (
               <li key={q.id} style={styles.item}>
                 <div
                   style={styles.itemHeader}
@@ -271,7 +307,6 @@ const styles: Record<string, React.CSSProperties> = {
   analysis: { marginTop: '4px', paddingTop: '12px', borderTop: '1px dashed #ddd' },
   questionImage: { width: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '10px', marginBottom: '10px', background: '#f0f0f0' },
   analysisHeader: { fontSize: '13px', fontWeight: 600, color: '#555', marginBottom: '6px' },
-  analysisContent: { fontSize: '13px', color: '#555', lineHeight: '1.7' },
   actions: { display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' },
   redoBtn: {
     flex: 1, display: 'block', padding: '8px 0', fontSize: '13px', fontWeight: 600,
@@ -282,7 +317,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 14px', fontSize: '12px', fontWeight: 500, color: '#888',
     background: '#f0f0f0', border: 'none', borderRadius: '10px', cursor: 'pointer',
   },
-  filterBar: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' },
+  filterBar: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' },
+  sortBar: { display: 'flex', gap: '6px', marginBottom: '14px', alignItems: 'center' },
+  sortSelect: {
+    fontSize: '13px', fontWeight: 500, padding: '7px 10px', borderRadius: '10px',
+    border: '1px solid #e0e4ee', color: '#555', background: 'white', cursor: 'pointer', outline: 'none',
+  },
+  sortDirBtn: {
+    padding: '7px 12px', fontSize: '13px', fontWeight: 500, color: '#667eea',
+    background: '#eef1ff', border: 'none', borderRadius: '10px', cursor: 'pointer', whiteSpace: 'nowrap',
+  },
   filterBtn: {
     display: 'inline-flex', alignItems: 'center', gap: '4px',
     padding: '6px 12px', fontSize: '13px', fontWeight: 500,

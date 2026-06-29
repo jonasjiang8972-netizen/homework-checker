@@ -2,15 +2,37 @@ import { getSupabase } from '../../../lib/supabase';
 import { NextRequest, NextResponse } from 'next/server';
 import type { GradingResult } from '../../../lib/grading';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ data: [], warning: '未配置数据库，仅展示本地数据' });
   }
-  const { data, error } = await supabase
-    .from('questions')
-    .select('*')
-    .order('created_at', { ascending: false });
+
+  const { searchParams } = new URL(request.url);
+  const sortBy = searchParams.get('sort_by') || 'created_at';
+  const order = searchParams.get('order') || 'desc';
+  const filterKp = searchParams.get('filter_kp');
+  const filterError = searchParams.get('filter_error');
+  const filterSubject = searchParams.get('filter_subject');
+
+  let query = supabase.from('questions').select('*');
+
+  if (filterKp) {
+    query = query.eq('knowledge_point', filterKp);
+  }
+  if (filterError === 'correct') {
+    query = query.eq('is_correct', true);
+  } else if (filterError === 'wrong') {
+    query = query.eq('is_correct', false);
+  }
+  if (filterSubject) {
+    query = query.eq('subject', filterSubject);
+  }
+
+  const sortColumn = ['created_at', 'knowledge_point', 'subject', 'error_type'].includes(sortBy) ? sortBy : 'created_at';
+  const sortOrder = order === 'asc' ? true : false;
+
+  const { data, error } = await query.order(sortColumn, { ascending: sortOrder });
 
   if (error) {
     return NextResponse.json({ error: '获取错题列表失败' }, { status: 500 });
