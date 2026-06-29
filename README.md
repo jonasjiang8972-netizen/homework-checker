@@ -4,9 +4,9 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
@@ -17,17 +17,19 @@
 
 | 功能 | 说明 | 状态 |
 |------|------|------|
-| 📸 **拍照批改** | 支持拍照/相册上传，AI 识别题目并批改 | ✅ 已实现 |
+| 📸 **拍照批改** | 支持拍照/相册上传，AI 视觉直接批改（不经过 OCR） | ✅ 已实现 |
+| 👁️ **视觉预检** | AI 先判断图片是否可批改，再决定批改策略 | ✅ 已实现 |
 | 🏷️ **知识点打标** | 自动识别题目所属知识点与错误类型 | ✅ 已实现 |
 | 📊 **掌握度统计** | 可视化展示各知识点掌握程度热力图 | ✅ 已实现 |
 | 📋 **学习计划** | AI 基于薄弱点自动生成个性化学习方案 | ✅ 已实现 |
 | 📝 **智能测验** | 针对薄弱知识点生成同类题目进行测验 | ✅ 已实现 |
-| 💾 **错题本** | 自动归档错题，支持分类与回放 | ✅ 已实现 |
-| 🔐 **用户登录** | Google OAuth 一键登录 | ✅ 已实现 |
+| 💾 **错题本** | 自动归档错题，支持分类与回放（SQLite 本地存储） | ✅ 已实现 |
+| 🔐 **邮箱验证码登录** | 输入邮箱接收验证码登录，无需 OAuth | ✅ 已实现 |
 | 🖼️ **Markdown 渲染** | 公式/列表/代码块美化渲染 | ✅ 已实现 |
 | 🔀 **多学科支持** | 数学/语文/英语多学科切换 | ✅ 已实现 |
 | 🔄 **错题重做** | 重做错题并对照正确答案 | ✅ 已实现 |
-| 🐳 **Docker 部署** | 一键 Docker Compose 启动 | ✅ 已实现 |
+| 🤖 **多模型选择** | 支持 78+ 个 AI 模型切换（含 17 个视觉模型） | ✅ 已实现 |
+| 🐳 **Docker 部署** | 一键 Docker Compose 启动，内置 SQLite 数据库 | ✅ 已实现 |
 
 ---
 
@@ -86,23 +88,24 @@ npm run dev
 在 `.env.local` 中配置以下变量：
 
 ```bash
-# Claude API（AI 批改核心）
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# AI API Key（使用 SiliconFlow / 任意 OpenAI 兼容 API）
+ANTHROPIC_API_KEY=your_api_key_here
+ANTHROPIC_BASE_URL=https://api.siliconflow.cn/v1
+ANTHROPIC_MODEL=Qwen/Qwen3-VL-32B-Instruct
 
-# Supabase 数据库
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+# 邮件服务（验证码登录）
+RESEND_API_KEY=re_xxxxxxxxxxxx
 
-# Google OAuth（可选，用于登录）
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
+# NextAuth 配置
+NEXTAUTH_SECRET=your_nextauth_secret
+NEXTAUTH_URL=http://localhost:3000
 ```
 
 获取密钥指引：
-- **Anthropic**: [console.anthropic.com](https://console.anthropic.com)
-- **Supabase**: [supabase.com](https://supabase.com)
-- **Google OAuth**: [console.cloud.google.com](https://console.cloud.google.com)
+- **SiliconFlow**: [cloud.siliconflow.cn](https://cloud.siliconflow.cn)
+- **任意 OpenAI 兼容 API**: 设置 `ANTHROPIC_BASE_URL` 为你的 API 地址
+- **Resend**: [resend.com](https://resend.com)（用于登录验证码）
+- **`NEXTAUTH_SECRET`**: 可用 `openssl rand -hex 32` 生成
 
 ---
 
@@ -112,8 +115,9 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 homework-checker/
 ├── app/                       # Next.js App Router
 │   ├── api/                   # API Routes
-│   │   ├── auth/             # NextAuth 登录
-│   │   ├── correct/          # 拍照批改接口
+│   │   ├── auth/             # 验证码登录 / NextAuth
+│   │   ├── correct/          # 拍照批改（视觉AI + OCR回退）
+│   │   ├── models/           # 可用模型列表（所有 SiliconFlow 模型）
 │   │   ├── user/             # 用户 Key / 设置
 │   │   ├── questions/        # 错题 CRUD
 │   │   ├── stats/            # 掌握度统计
@@ -123,25 +127,35 @@ homework-checker/
 │   ├── history/              # 错题本页面
 │   ├── plans/                # 学习计划页面
 │   ├── quiz/                 # 测验页面
+│   ├── settings/             # 登录 / 设置 / 模型选择
 │   ├── docs/                 # 项目文档
-│   └── page.tsx              # 首页（拍照批改）
+│   └── page.tsx              # 首页（拍照批改，需登录）
 ├── lib/                       # 核心库
+│   ├── db.ts                 # SQLite 数据库初始化 + Schema
+│   ├── supabase.ts           # SQLite 查询构建器（兼容 Supabase API）
 │   ├── grading.ts            # 批改结果解析
 │   ├── mastery.ts            # 掌握度计算算法
-│   └── supabase.ts           # Supabase 客户端封装
+│   ├── auth-utils.ts         # API Key 获取与用户工具
+│   ├── ocr.ts                # OCR 文字识别（仅回退使用）
+│   ├── email.ts              # 邮件发送（验证码）
+│   ├── encryption.ts         # AES 加密解密
+│   └── retry.ts              # 重试机制
+├── components/               # 客户端组件
+│   ├── ModelSelector.tsx     # 动态模型选择器（搜索 + 多模态筛选）
+│   ├── BottomNav.tsx         # 底部导航栏
+│   └── SessionProvider.tsx   # NextAuth 会话提供者
 ├── docs/                      # 项目文档集
 │   ├── PRD.md                # 产品需求文档
 │   ├── ARCHITECTURE.md       # 技术架构文档
 │   ├── TECHNICAL.md          # 技术实现细节
 │   ├── USER_GUIDE.md         # 用户操作手册
 │   ├── DEPLOYMENT.md         # 部署运维指南
-│   ├── v2.5-ROADMAP.md       # v2.5 路线图
-│   └── db-schema-v2.sql      # 数据库结构
+│   └── db-schema-v2.sql      # 数据库结构（SQLite 兼容）
+├── data/                      # SQLite 数据库文件（Docker volume）
 ├── .env.local                 # 环境变量（不提交）
-├── Dockerfile                 # Docker 构建
+├── Dockerfile                 # Docker 多阶段构建
 ├── docker-compose.yml         # Docker Compose 编排
 ├── setup.sh                   # 一键安装脚本
-├── .dockerignore
 ├── package.json
 ├── next.config.js
 └── tsconfig.json
@@ -156,10 +170,11 @@ homework-checker/
 | **前端** | Next.js 16 + React 19 | App Router 全栈框架 |
 | **语言** | TypeScript 6 | 类型安全 |
 | **样式** | 内联 Styles | 零配置起步 |
-| **AI** | Claude 3.5 Sonnet | 视觉批改模型 |
-| **数据库** | Supabase PostgreSQL | 免费云数据库 |
-| **存储** | Supabase Storage | 图片存储桶 |
-| **认证** | NextAuth + Google OAuth | 社交登录 |
+| **AI** | SiliconFlow（OpenAI 兼容） | 78+ 模型可选，17 个视觉模型 |
+| **默认模型** | Qwen/Qwen3-VL-32B-Instruct | 视觉多模态大模型 |
+| **数据库** | SQLite（sql.js） | 嵌入式 WASM 数据库，无需外部服务 |
+| **存储** | 本地文件系统 | `public/uploads/` + Docker volume |
+| **认证** | NextAuth + 邮箱验证码 | Resend 邮件服务 |
 
 ---
 
@@ -188,7 +203,7 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 ### 知识点标签提取
 
-通过 Prompt 工程约束 Claude 输出结构化 JSON：
+通过 Prompt 工程约束 AI 输出结构化 JSON：
 
 ```json
 {
@@ -206,6 +221,8 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 ## 🗂️ 数据库设计
 
+使用 **SQLite**（通过 `sql.js` WASM 嵌入），零外部依赖，数据持久化在 `data/homework.db`（Docker volume）。
+
 ### 核心表结构
 
 | 表名 | 说明 |
@@ -214,8 +231,9 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 | `knowledge_points` | 知识点字典 + 掌握度统计 |
 | `study_plans` | AI 生成学习计划 |
 | `test_records` | 测验记录与结果 |
+| `user_settings` | 用户偏好 / 加密 API Key |
 
-完整建表 SQL 见 [docs/db-schema-v2.sql](docs/db-schema-v2.sql)
+完整建表语句见 [lib/db.ts](lib/db.ts)
 
 ---
 
@@ -227,12 +245,9 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 chmod +x setup.sh && ./setup.sh
 ```
 
-### Vercel 部署
+### Vercel / 其他托管平台
 
-1. [Fork](https://github.com/jonasjiang8972-netizen/homework-checker/fork) 本项目
-2. [Vercel](https://vercel.com) → Import Project → 选择仓库
-3. 配置环境变量（与 `.env.local` 一致）
-4. Deploy → 自动分配生产域名
+本项目依赖 SQLite 本地文件系统，建议使用 Docker 部署。如果需要在无状态平台部署，需额外配置持久化存储。
 
 详细部署步骤见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
@@ -246,8 +261,8 @@ chmod +x setup.sh && ./setup.sh
 | [技术架构文档](docs/ARCHITECTURE.md) | 四层架构、技术选型、数据流 |
 | [技术实现文档](docs/TECHNICAL.md) | 逐模块实现细节、容错策略 |
 | [用户操作手册](docs/USER_GUIDE.md) | 使用流程、界面说明、FAQ |
-| [部署运维指南](docs/DEPLOYMENT.md) | 环境变量、建表 SQL、Vercel 部署 |
-| [v2.5 路线图](docs/v2.5-ROADMAP.md) | OCR 文字识别 + 邮箱登录 |
+| [部署运维指南](docs/DEPLOYMENT.md) | 环境变量、Docker 部署 |
+| [CHANGELOG](CHANGELOG.md) | 版本历史与变更记录 |
 
 ---
 
@@ -273,6 +288,8 @@ v2.0 从「批改工具」升级为「自适应学习助理」：
 ```
 
 **闭环流程**：批改 → 打标签 → 计算掌握度 → 生成计划 → 测验验收 → 反馈更新
+
+**v2.6 新增**：AI 视觉直接批改替代 OCR、SiliconFlow 多模型切换、SQLite 本地数据库
 
 ---
 
@@ -306,8 +323,9 @@ MIT License - 见 [LICENSE](LICENSE) 文件
 ## 🙏 致谢
 
 - **Next.js**: 优秀的 React 全栈框架
-- **Supabase**: 强大的开源 Firebase 替代
-- **Anthropic Claude**: 强大的多模态 AI 模型
+- **SQL.js**: 强大的 WASM SQLite 实现
+- **SiliconFlow**: 丰富的 AI 模型平台
+- **Resend**: 简洁的邮件发送服务
 - **NextAuth**: 简洁的身份认证方案
 
 ---

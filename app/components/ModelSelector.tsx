@@ -2,52 +2,112 @@
 
 import { useState, useEffect } from 'react';
 
-const AVAILABLE_MODELS = [
-  { id: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', desc: '速度快，适合基础题型' },
-  { id: 'claude-3-5-haiku-latest', label: 'Claude 3.5 Haiku', desc: '平衡速度与准确度' },
-  { id: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet', desc: '准确度高，适合复杂题型' },
-  { id: 'claude-3-opus-20240229', label: 'Claude 3 Opus', desc: '最高准确度，耗时较长' },
-];
+interface ModelInfo {
+  id: string;
+  owned_by: string;
+  is_vision: boolean;
+  is_text: boolean;
+  is_image_gen: boolean;
+}
 
 export function ModelSelector() {
-  const [selected, setSelected] = useState('claude-3-5-sonnet-latest');
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [selected, setSelected] = useState('');
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterVision, setFilterVision] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('selectedModel');
-    if (saved) setSelected(saved);
+    fetch('/api/models')
+      .then(r => r.json())
+      .then(data => {
+        const list = data.models || [];
+        setModels(list);
+        if (saved && list.some((m: ModelInfo) => m.id === saved)) {
+          setSelected(saved);
+        } else if (list.length > 0) {
+          const defaultVision = list.find((m: ModelInfo) => m.is_vision && !m.is_image_gen);
+          setSelected(defaultVision?.id || list[0].id);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setModels([]);
+        setLoading(false);
+      });
   }, []);
 
-  const handleSelect = (id: string) => {
-    setSelected(id);
-    localStorage.setItem('selectedModel', id);
-    setOpen(false);
-  };
+  useEffect(() => {
+    if (selected) localStorage.setItem('selectedModel', selected);
+  }, [selected]);
 
-  const current = AVAILABLE_MODELS.find(m => m.id === selected);
+  const filtered = models.filter(m => {
+    if (filterVision && !m.is_vision) return false;
+    if (search && !m.id.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const current = models.find(m => m.id === selected);
+
+  if (loading) {
+    return <div style={styles.button}>🤖 加载模型中...</div>;
+  }
 
   return (
     <div>
       <button onClick={() => setOpen(true)} style={styles.button}>
-        🤖 {current?.label || selected}
+        🤖 {current?.id?.split('/').pop() || '选择模型'}
+        {current?.is_vision && ' 📷'}
       </button>
       {open && (
         <div onClick={() => setOpen(false)} style={styles.overlay}>
           <div onClick={e => e.stopPropagation()} style={styles.modal}>
             <div style={styles.modalTitle}>选择 AI 模型</div>
-            {AVAILABLE_MODELS.map(m => (
-              <div
-                key={m.id}
-                onClick={() => handleSelect(m.id)}
+
+            <div style={styles.filterRow}>
+              <input
+                type="text"
+                placeholder="搜索模型..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={styles.searchInput}
+              />
+              <button
+                onClick={() => setFilterVision(!filterVision)}
                 style={{
-                  ...styles.option,
-                  ...(selected === m.id ? styles.optionSelected : {}),
+                  ...styles.filterBtn,
+                  ...(filterVision ? styles.filterBtnActive : {}),
                 }}
               >
-                <div style={styles.optionLabel}>{m.label}</div>
-                <div style={styles.optionDesc}>{m.desc}</div>
-              </div>
-            ))}
+                📷 仅多模态
+              </button>
+            </div>
+
+            <div style={styles.modelList}>
+              {filtered.length === 0 && (
+                <div style={styles.empty}>没有匹配的模型</div>
+              )}
+              {filtered.map(m => (
+                <div
+                  key={m.id}
+                  onClick={() => { setSelected(m.id); setOpen(false); }}
+                  style={{
+                    ...styles.option,
+                    ...(selected === m.id ? styles.optionSelected : {}),
+                  }}
+                >
+                  <div style={styles.optionHeader}>
+                    <span style={styles.optionLabel}>{m.id.split('/').pop()}</span>
+                    <span style={styles.optionProvider}>{m.id.split('/')[0]}</span>
+                    {m.is_vision && <span style={styles.visionBadge}>📷</span>}
+                  </div>
+                  <div style={styles.optionId}>{m.id}</div>
+                </div>
+              ))}
+            </div>
+
             <button onClick={() => setOpen(false)} style={styles.closeBtn}>关闭</button>
           </div>
         </div>
@@ -60,7 +120,7 @@ const styles: Record<string, React.CSSProperties> = {
   button: {
     width: '100%', padding: '10px', fontSize: '13px', fontWeight: 500,
     background: '#f0f3ff', color: '#667eea', border: '1px solid #d0d8f0',
-    borderRadius: '10px', cursor: 'pointer',
+    borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
   },
   overlay: {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
@@ -69,24 +129,51 @@ const styles: Record<string, React.CSSProperties> = {
   },
   modal: {
     background: 'white', borderRadius: '16px', padding: '20px',
-    width: '320px', maxWidth: '90vw',
+    width: '380px', maxWidth: '90vw', maxHeight: '80vh', display: 'flex',
+    flexDirection: 'column',
   },
   modalTitle: {
     fontSize: '16px', fontWeight: 700, color: '#1a1a2e',
-    marginBottom: '14px', textAlign: 'center',
+    marginBottom: '12px', textAlign: 'center',
+  },
+  filterRow: {
+    display: 'flex', gap: '8px', marginBottom: '12px',
+  },
+  searchInput: {
+    flex: 1, padding: '8px 12px', fontSize: '13px',
+    border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none',
+  },
+  filterBtn: {
+    padding: '8px 12px', fontSize: '12px', fontWeight: 500,
+    border: '1px solid #e0e4ee', borderRadius: '8px', cursor: 'pointer',
+    background: 'white', color: '#666', whiteSpace: 'nowrap',
+  },
+  filterBtnActive: {
+    background: '#eef1ff', color: '#4f6ef7', borderColor: '#4f6ef7',
+  },
+  modelList: {
+    flex: 1, overflowY: 'auto', marginBottom: '8px',
+  },
+  empty: {
+    textAlign: 'center', padding: '20px', color: '#8e95a2', fontSize: '13px',
   },
   option: {
-    padding: '12px', borderRadius: '10px', cursor: 'pointer',
-    marginBottom: '6px', border: '1px solid #eee',
+    padding: '10px 12px', borderRadius: '10px', cursor: 'pointer',
+    marginBottom: '4px', border: '1px solid #eee',
   },
   optionSelected: {
     borderColor: '#667eea', background: '#eef1ff',
   },
+  optionHeader: {
+    display: 'flex', alignItems: 'center', gap: '6px',
+  },
   optionLabel: { fontSize: '14px', fontWeight: 600, color: '#333' },
-  optionDesc: { fontSize: '12px', color: '#888', marginTop: '2px' },
+  optionProvider: { fontSize: '11px', color: '#aaa', fontWeight: 400 },
+  visionBadge: { fontSize: '14px', marginLeft: 'auto' },
+  optionId: { fontSize: '11px', color: '#999', marginTop: '2px' },
   closeBtn: {
     width: '100%', padding: '10px', fontSize: '14px', fontWeight: 500,
     color: '#888', background: '#f0f0f0', border: 'none',
-    borderRadius: '10px', cursor: 'pointer', marginTop: '8px',
+    borderRadius: '10px', cursor: 'pointer', marginTop: '4px',
   },
 };

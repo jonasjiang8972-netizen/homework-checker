@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { IconSettings, IconLogout, IconMail, IconCheck } from '../../lib/icons';
+import { ModelSelector } from '../components/ModelSelector';
 
 export default function Settings() {
   const { data: session, status } = useSession();
@@ -273,13 +274,8 @@ export default function Settings() {
 
           <div style={styles.settingRow}>
             <label style={styles.settingLabel}>AI 模型</label>
-            <select value={defaultModel} onChange={e => setDefaultModel(e.target.value)} style={styles.select}>
-              <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-              <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
-              <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
-              <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-            </select>
           </div>
+          <ModelSelector />
 
           <button onClick={handleSaveSettings} style={styles.primaryBtn}>保存</button>
         </section>

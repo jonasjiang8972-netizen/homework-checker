@@ -9,13 +9,14 @@ import { IconCamera, IconCheck, IconX } from '../lib/icons';
 const SUBJECTS = ['数学', '语文', '英语', '其他'];
 
 export default function Home() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [grading, setGrading] = useState<GradingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
+  const [slowWarning, setSlowWarning] = useState(false);
   const [saved, setSaved] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [subject, setSubject] = useState('数学');
@@ -45,8 +46,13 @@ export default function Home() {
   };
 
   const startTimer = () => {
-    setElapsed(0);
-    timerRef.current = setInterval(() => setElapsed((t) => t + 1), 1000);
+    setElapsed(0); setSlowWarning(false);
+    timerRef.current = setInterval(() => {
+      setElapsed((t) => {
+        if (t === 25) setSlowWarning(true);
+        return t + 1;
+      });
+    }, 1000);
   };
   const stopTimer = () => { if (timerRef.current) clearInterval(timerRef.current); timerRef.current = null; };
 
@@ -56,19 +62,22 @@ export default function Home() {
     const rawFile = fileInput?.files?.[0];
     if (!rawFile) return;
 
-    setLoading(true); setGrading(null); setError(''); setSaved(false);
+    setLoading(true); setGrading(null); setError(''); setSaved(false); setSlowWarning(false);
     startTimer();
     setLoadingDetail('正在准备图片...');
 
     try {
       const compressed = await compressImage(rawFile);
-      setLoadingDetail('正在准备图片...');
+      setLoadingDetail('正在上传图片...');
 
       const formData = new FormData();
       formData.append('image', compressed);
       const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
       if (savedModel) formData.append('model', savedModel);
 
+      setLoadingDetail('正在检查图片...');
+
+      setLoadingDetail('正在AI批改...');
       const response = await fetch('/api/correct', { method: 'POST', body: formData });
       const data = await response.json();
 
@@ -114,6 +123,31 @@ export default function Home() {
     }
   };
 
+  if (status === 'loading') {
+    return (
+      <div style={styles.page}>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#8e95a2' }}>加载中...</div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div style={styles.page}>
+        <div style={{ maxWidth: '400px', margin: '40px auto', textAlign: 'center', padding: '32px 20px', background: 'white', borderRadius: '16px', border: '1px solid #eef0f4' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 8px 0' }}>请先登录</h2>
+          <p style={{ fontSize: '14px', color: '#8e95a2', margin: '0 0 20px 0', lineHeight: '1.5' }}>
+            使用前需要验证身份，防止 API 被滥用
+          </p>
+          <a href="/settings" style={{ display: 'inline-block', padding: '12px 32px', fontSize: '15px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '12px', cursor: 'pointer', textDecoration: 'none' }}>
+            前往登录
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
       <div style={styles.header}>
@@ -134,6 +168,9 @@ export default function Home() {
         <div style={styles.loadingBox}>
           <div style={styles.spinner} />
           <div style={styles.loadingText}>{loadingDetail} {elapsed}s</div>
+          {slowWarning && (
+            <div style={styles.slowWarning}>处理时间较长，AI 正在努力批改中...</div>
+          )}
         </div>
       )}
 
@@ -219,9 +256,10 @@ const styles: Record<string, React.CSSProperties> = {
   btn: { width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '12px', cursor: 'pointer' },
   btnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
   btnSaved: { color: '#27ae60', background: '#eafaf1', cursor: 'default' },
-  loadingBox: { textAlign: 'center', padding: '40px', color: '#8e95a2' },
+  loadingBox: { textAlign: 'center', padding: '40px 20px', color: '#8e95a2' },
   spinner: { width: '32px', height: '32px', borderRadius: '50%', border: '3px solid #eef0f4', borderTopColor: '#4f6ef7', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' },
   loadingText: { fontSize: '14px' },
+  slowWarning: { fontSize: '12px', color: '#e67e22', marginTop: '8px', padding: '8px 12px', background: '#fef9e7', borderRadius: '8px' },
   error: { padding: '12px 16px', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '10px', color: '#d63031', fontSize: '13px', marginBottom: '12px' },
   result: { marginTop: '16px', padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4' },
   verdictOk: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '16px', fontWeight: 600, color: '#27ae60', marginBottom: '12px' },

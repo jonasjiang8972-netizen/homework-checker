@@ -6,6 +6,42 @@
 
 ---
 
+## [2.6.0] - 2026-06-29
+
+### 🔄 平台切换 + SQLite 本地数据库 + 视觉 AI 批改
+
+#### 🤖 AI 平台切换
+- [x] 从 Anthropic SDK / DeepSeek 代理切换至 **SiliconFlow**（OpenAI 兼容 API）
+- [x] 动态模型列表 API `GET /api/models`，展示全部 78 个可用模型
+- [x] 自动识别 17 个多模态（视觉）模型并标记 📷
+- [x] 设置页模型选择器重构：搜索、筛选多模态、实时从 API 拉取
+
+#### 👁️ 视觉 AI 批改（替代 OCR）
+- [x] 新增视觉预检：先让 AI 判断图片是否包含可批改内容，15s 超时
+- [x] 预检通过 → 直接发送图片给 AI 视觉模型批改（不经过 OCR）
+- [x] 预检失败 → 回退 OCR 文字提取 + 文本批改
+- [x] 默认模型 `Qwen/Qwen3-VL-32B-Instruct`（Qwen3 视觉大模型）
+- [x] 修复 tesseract.js 在 standalone 构建中的崩溃问题（动态 import）
+
+#### 🗄️ SQLite 本地数据库（替代 Supabase）
+- [x] 移除 Supabase 云数据库依赖，改用 **sql.js**（WASM SQLite）嵌入程序
+- [x] 5 张完整表：`questions`、`knowledge_points`、`study_plans`、`test_records`、`user_settings`
+- [x] 查询构建器兼容 Supabase API 风格（`.select().eq().order()`）
+- [x] 数据持久化：`docker-compose.yml` 添加 `./data:/app/data` volume
+- [x] 容器重启数据不丢失
+
+#### 🔒 安全加固
+- [x] 首页强制登录：未登录显示"请先登录"提示
+- [x] `POST /api/correct` 后端验证 session，未登录返回 401
+- [x] 防止 API Key 被匿名用户消耗
+
+#### ⚡ 性能与体验优化
+- [x] Nginx 代理超时从 60s 提升至 180s
+- [x] API 超时分段控制：预检 15s、视觉批改 120s、文本批改 60s
+- [x] `AbortController` 替代 `AbortSignal.timeout`（更可靠）
+- [x] 客户端加载阶段提示：上传图片 → 检查图片 → AI批改
+- [x] 25s 慢加载警告提示
+
 ## [2.5.0] - 2026-06-29
 
 ### 🤖 OCR 文字识别 + 邮箱验证码登录

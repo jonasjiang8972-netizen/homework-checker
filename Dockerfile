@@ -30,7 +30,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-RUN mkdir -p /app/public/uploads && chown nextjs:nodejs /app/public/uploads
+RUN mkdir -p /app/public/uploads /app/data && chown nextjs:nodejs /app/public/uploads /app/data
+
+RUN mkdir -p /app/node_modules/sql.js/dist
+COPY --from=builder /app/node_modules/sql.js/dist/sql-wasm.wasm /app/node_modules/sql.js/dist/sql-wasm.wasm
 
 USER nextjs
 

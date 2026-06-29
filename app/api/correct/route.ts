@@ -1,66 +1,105 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
 import { retry } from '../../../lib/retry';
 import { getApiKey } from '../../../lib/auth-utils';
-import { ocrImage } from '../../../lib/ocr';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
 
-const DEFAULT_MODEL = 'claude-3-5-sonnet-latest';
-const TIMEOUT_MS = 60000;
+const DEFAULT_MODEL = 'Qwen/Qwen3-VL-32B-Instruct';
+const VISION_CHECK_MODEL = 'Qwen/Qwen3-VL-8B-Instruct';
+const TEXT_FALLBACK_MODEL = 'Qwen/Qwen3-32B';
 
-async function callAnthropicText(
-  anthropic: Anthropic,
-  ocrText: string,
-  model: string
-): Promise<string> {
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: 2000,
-    temperature: 0.2,
-    messages: [{
-      role: 'user',
-      content: [
-        {
-          type: 'text',
-          text: `以下是从学生作业图片中通过OCR提取的题目文字，可能存在识别错误，请根据文字内容批改：\n\n---\n${ocrText}\n---`,
-        },
-        { type: 'text', text: GRADING_PROMPT },
-      ],
-    }],
-  });
+const PRECHECK_TIMEOUT_MS = 15000;
+const VISION_TIMEOUT_MS = 120000;
+const TEXT_TIMEOUT_MS = 60000;
 
-  const textBlock = response.content.find(c => c.type === 'text');
-  return (textBlock && 'text' in textBlock) ? textBlock.text : '';
+const VISION_PRECHECK_PROMPT = `判断这张图片是否包含可批改的作业题目。包含清晰题目文字回复 YES，否则回复 NO。只回复 YES 或 NO。`;
+
+function getBaseURL(): string {
+  return process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
+}
+
+async function fetchAI(messages: any[], model: string, maxTokens: number, temperature: number, timeoutMs: number): Promise<string> {
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error('No API key');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${getBaseURL()}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`AI API ${response.status}: ${err.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function precheckVision(imageBase64: string, contentType: string): Promise<boolean | null> {
+  try {
+    const dataUrl = `data:${contentType};base64,${imageBase64}`;
+    const raw = await fetchAI(
+      [{ role: 'user', content: [{ type: 'image_url', image_url: { url: dataUrl } }, { type: 'text', text: VISION_PRECHECK_PROMPT }] }],
+      VISION_CHECK_MODEL, 10, 0, PRECHECK_TIMEOUT_MS,
+    );
+    return raw.trim().toUpperCase().includes('YES');
+  } catch {
+    return null;
+  }
+}
+
+async function callVisionGrading(imageBase64: string, contentType: string, model: string): Promise<string> {
+  const dataUrl = `data:${contentType};base64,${imageBase64}`;
+  return fetchAI(
+    [{ role: 'user', content: [{ type: 'image_url', image_url: { url: dataUrl } }, { type: 'text', text: `请直接批改图片中的作业题目。${GRADING_PROMPT}` }] }],
+    model, 2000, 0.2, VISION_TIMEOUT_MS,
+  );
+}
+
+async function callTextGrading(ocrText: string, model: string): Promise<string> {
+  return fetchAI(
+    [{ role: 'user', content: [{ type: 'text', text: `以下是从学生作业图片中通过OCR提取的题目文字：\n\n---\n${ocrText}\n---` }, { type: 'text', text: GRADING_PROMPT }] }],
+    model, 2000, 0.2, TEXT_TIMEOUT_MS,
+  );
 }
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
-  const apiKey = await getApiKey();
+  const session = await getServerSession();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: '请先登录后再使用批改功能' }, { status: 401 });
+  }
 
+  const apiKey = await getApiKey();
   if (!apiKey) {
-    return NextResponse.json(
-      { error: '未配置 Claude API Key。请在 .env.local 填写或登录后在设置页添加。' },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: '未配置 API Key' }, { status: 503 });
   }
 
   const formData = await request.formData();
   const image = formData.get('image') as File | null;
-  if (!image) {
-    return NextResponse.json({ error: '未收到图片' }, { status: 400 });
-  }
+  if (!image) return NextResponse.json({ error: '未收到图片' }, { status: 400 });
   if (image.size > 10 * 1024 * 1024) {
     return NextResponse.json({ error: '图片过大，请小于 10MB' }, { status: 413 });
   }
 
-  const requestedModel = formData.get('model') as string | null;
-  const model = MODEL_MAP[requestedModel || process.env.ANTHROPIC_MODEL || ''] || DEFAULT_MODEL;
-
+  const model = (formData.get('model') as string) || DEFAULT_MODEL;
   const bytes = Buffer.from(await image.arrayBuffer());
+  const contentType = getMimeType(image);
+  const imageBase64 = bytes.toString('base64');
 
   let imageUrl: string | null = null;
   try {
@@ -70,62 +109,55 @@ export async function POST(request: NextRequest) {
     const filename = `${crypto.randomUUID()}.${ext}`;
     await writeFile(join(uploadsDir, filename), bytes);
     imageUrl = `/uploads/${filename}`;
-  } catch {
-    // image save failed, continue without it
-  }
-
-  let ocrText = '';
-  try {
-    ocrText = await ocrImage(bytes);
-  } catch {
-    return NextResponse.json({ error: '图片文字识别失败，请确保图片清晰' }, { status: 422 });
-  }
-
-  if (!ocrText) {
-    return NextResponse.json({ error: '未能从图片中识别到文字，请确保图片包含清晰题目' }, { status: 422 });
-  }
-
-  const anthropic = new Anthropic({ apiKey, timeout: TIMEOUT_MS, baseURL: process.env.ANTHROPIC_BASE_URL });
+  } catch {}
 
   try {
+    const visionFeasible = await precheckVision(imageBase64, contentType);
+
     let raw = '';
-    
-    try {
-      raw = await retry(
-        () => callAnthropicText(anthropic, ocrText, model),
-        {
-          maxRetries: 2,
-          delayMs: 1500,
-          onRetry: (attempt, error) => {
-            console.log(`Attempt ${attempt} failed: ${error.message}`);
-          },
-        }
-      );
-    } catch (retryError) {
-      if (retryError instanceof Error && 
-          (retryError.message.includes('timeout') || retryError.message.includes('timed out'))) {
-        return NextResponse.json(
-          { 
-            error: '批改超时，请重试。如果问题持续，请检查网络或稍后重试',
-            retryCount: 2,
-            lastError: retryError.message
-          },
-          { status: 504 }
+
+    if (visionFeasible) {
+      try {
+        raw = await retry(
+          () => callVisionGrading(imageBase64, contentType, model),
+          { maxRetries: 1, delayMs: 2000, onRetry: (a) => console.log(`Vision retry ${a}`) },
         );
+      } catch { raw = ''; }
+    }
+
+    if (!raw && visionFeasible === false) {
+      return NextResponse.json({ error: 'AI 无法处理这张图片，请重新拍照（确保图片清晰、光线充足、包含完整题目）' }, { status: 422 });
+    }
+
+    if (!raw) {
+      let ocrText = '';
+      try {
+        const { ocrImage } = await import('../../../lib/ocr');
+        ocrText = await ocrImage(bytes);
+      } catch {
+        return NextResponse.json({ error: 'AI 无法直接处理这张图片。请重新拍照，确保图片清晰、光线充足。' }, { status: 422 });
       }
-      throw retryError;
+      if (!ocrText) {
+        return NextResponse.json({ error: '未能从图片中识别到文字，请确保图片包含清晰题目' }, { status: 422 });
+      }
+      try {
+        raw = await retry(
+          () => callTextGrading(ocrText, TEXT_FALLBACK_MODEL),
+          { maxRetries: 1, delayMs: 1500, onRetry: (a) => console.log(`Text retry ${a}`) },
+        );
+      } catch {
+        return NextResponse.json({ error: '批改超时，AI 暂时无响应，请重试' }, { status: 504 });
+      }
+    }
+
+    if (!raw) {
+      return NextResponse.json({ error: '批改失败，请重试' }, { status: 502 });
     }
 
     const grading = parseGrading(raw);
-    const processingTime = Date.now() - startTime;
-
-    return NextResponse.json({ grading, imageUrl, processingTime });
+    return NextResponse.json({ grading, imageUrl, processingTime: Date.now() - startTime, visionUsed: visionFeasible === true });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : '未知错误';
-    return NextResponse.json(
-      { error: '批改服务暂时不可用，请稍后再试' },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: '批改服务暂时不可用，请稍后再试' }, { status: 502 });
   }
 }
 
@@ -139,10 +171,3 @@ function getMimeType(file: File): ImageMediaType {
   if (ext === 'gif') return 'image/gif';
   return 'image/jpeg';
 }
-
-const MODEL_MAP: Record<string, string> = {
-  'claude-3-haiku-20240307': 'claude-3-haiku-20240307',
-  'claude-3-5-haiku-latest': 'claude-3-5-haiku-latest',
-  'claude-3-5-sonnet-latest': 'claude-3-5-sonnet-latest',
-  'claude-3-opus-20240229': 'claude-3-opus-20240229',
-};

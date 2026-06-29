@@ -2,7 +2,7 @@ import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import { SupabaseAdapter } from '@auth/supabase-adapter';
-import { verifyCode } from '../../../../lib/auth-store';
+import { verifyCode } from '../send-code/route';
 
 function getAdapter() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
