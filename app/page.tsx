@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import type { GradingResult } from '../lib/grading';
 import { ModelSelector } from './components/ModelSelector';
 import { MarkdownRenderer } from '../lib/markdown-renderer';
 
 export default function Home() {
+  const { data: session } = useSession();
   const [grading, setGrading] = useState<GradingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState('');
@@ -177,10 +179,19 @@ export default function Home() {
         <nav style={styles.nav}>
           <a href="/history" style={styles.navLink}>📋 错题本</a>
           <a href="/dashboard" style={styles.navLink}>📊 掌握度</a>
-          <a href="/plans" style={styles.navLink}>📋 学习计划</a>
+          <a href="/plans" style={styles.navLink}>📋 计划</a>
           <a href="/quiz" style={styles.navLink}>📝 测验</a>
-          <a href="/api/auth/signin" style={styles.navLink}>🔗 登录</a>
         </nav>
+        <div style={styles.userBar}>
+          {session ? (
+            <a href="/settings" style={styles.userLink}>
+              <span style={styles.userDot} />
+              {session.user?.name || session.user?.email}
+            </a>
+          ) : (
+            <a href="/api/auth/signin" style={styles.userLink}>🔗 登录</a>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.uploadArea}>
@@ -290,8 +301,11 @@ const styles: Record<string, React.CSSProperties> = {
   logo: { fontSize: '56px', marginBottom: '8px' },
   title: { fontSize: '26px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 6px 0' },
   subtitle: { fontSize: '14px', color: '#888', margin: 0 },
-  nav: { display: 'flex', gap: '8px', marginBottom: '20px' },
+  nav: { display: 'flex', gap: '8px', marginBottom: '12px' },
   navLink: { flex: 1, display: 'block', padding: '10px 6px', textAlign: 'center', fontSize: '13px', color: '#667eea', background: '#f0f3ff', textDecoration: 'none', borderRadius: '10px', fontWeight: 500 },
+  userBar: { textAlign: 'center', marginBottom: '16px' },
+  userLink: { display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#888', textDecoration: 'none', padding: '4px 12px', borderRadius: '8px', background: '#f5f5f5' },
+  userDot: { width: '8px', height: '8px', borderRadius: '50%', background: '#27ae60', display: 'inline-block' },
   form: { display: 'flex', flexDirection: 'column', gap: '16px' },
   uploadArea: { border: '2px dashed #d0d5e0', borderRadius: '16px', padding: '32px 20px', textAlign: 'center', cursor: 'pointer', background: '#fafbfc' },
   uploadPlaceholder: { display: 'flex', flexDirection: 'column', alignItems: 'center' },

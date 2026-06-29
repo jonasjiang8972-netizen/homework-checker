@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
 import { uploadImage } from '../../../lib/supabase';
 import { retry } from '../../../lib/retry';
+import { getApiKey } from '../../../lib/auth-utils';
 
 type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
 
@@ -53,11 +54,12 @@ async function callAnthropic(
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  
-  if (!apiKey || apiKey.startsWith('your_')) {
+
+  const apiKey = await getApiKey();
+
+  if (!apiKey) {
     return NextResponse.json(
-      { error: '未配置 Claude API Key，请在 .env.local 填写 ANTHROPIC_API_KEY' },
+      { error: '未配置 Claude API Key。请在 .env.local 填写或登录后在设置页添加。' },
       { status: 503 }
     );
   }

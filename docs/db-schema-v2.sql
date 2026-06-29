@@ -76,3 +76,16 @@ create index if not exists idx_questions_kp on questions(knowledge_point);
 -- 文件大小限制: 10MB
 -- 允许 MIME: image/png, image/jpeg, image/gif, image/webp
 -- ============================================================
+
+-- ============================================================
+-- 6. 用户设置表（v2.3）
+-- 存储用户个人 API Key（AES-256-GCM 加密）与偏好
+-- ============================================================
+create table if not exists user_settings (
+  user_id text primary key,                    -- 使用 email 作为 user_id
+  anthropic_key_encrypted text,                -- AES-256-GCM 加密后的 API Key
+  default_subject text default '数学',
+  default_model text default 'claude-3-5-sonnet-latest',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
