@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth';
-import { getSupabaseAdmin } from '../../../../lib/supabase';
+import { execute, generateId } from '../../../../lib/db';
 import { encrypt, decrypt, maskApiKey } from '../../../../lib/encryption';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -16,19 +16,11 @@ export async function GET() {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  const supabase = getSupabaseAdmin();
-  if (!supabase) {
-    return NextResponse.json({ configured: false, error: '数据库未配置' });
-  }
+  const { queryOne } = await import('../../../../lib/db');
+  const row = queryOne('SELECT anthropic_key_encrypted FROM user_settings WHERE user_id = ?', [session.user.email]);
 
-  const { data } = await supabase
-    .from('user_settings')
-    .select('anthropic_key_encrypted')
-    .eq('user_id', session.user.email)
-    .single();
-
-  if (data?.anthropic_key_encrypted) {
-    const decrypted = decrypt(data.anthropic_key_encrypted);
+  if (row?.anthropic_key_encrypted) {
+    const decrypted = decrypt(row.anthropic_key_encrypted as string);
     return NextResponse.json({
       configured: true,
       maskedKey: decrypted ? maskApiKey(decrypted) : null,
@@ -62,17 +54,11 @@ export async function POST(request: NextRequest) {
 
   const encrypted = encrypt(body.apiKey.trim());
 
-  const { error } = await supabase
-    .from('user_settings')
-    .upsert({
-      user_id: session.user.email,
-      anthropic_key_encrypted: encrypted,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' });
-
-  if (error) {
-    return NextResponse.json({ error: '保存失败' }, { status: 500 });
-  }
+  execute(
+    `INSERT INTO user_settings (user_id, anthropic_key_encrypted, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET anthropic_key_encrypted = ?, updated_at = datetime('now')`,
+    [session.user.email, encrypted, encrypted],
+  );
 
   return NextResponse.json({ ok: true, maskedKey: maskApiKey(body.apiKey.trim()) });
 }
@@ -83,15 +69,10 @@ export async function DELETE() {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  const supabase = getSupabaseAdmin();
-  if (!supabase) {
-    return NextResponse.json({ error: '数据库未配置' }, { status: 503 });
-  }
-
-  await supabase
-    .from('user_settings')
-    .update({ anthropic_key_encrypted: null, updated_at: new Date().toISOString() })
-    .eq('user_id', session.user.email);
+  execute(
+    'UPDATE user_settings SET anthropic_key_encrypted = NULL, updated_at = datetime(\'now\') WHERE user_id = ?',
+    [session.user.email],
+  );
 
   return NextResponse.json({ ok: true });
 }

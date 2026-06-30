@@ -19,6 +19,7 @@ export default function Home() {
   const [slowWarning, setSlowWarning] = useState(false);
   const [saved, setSaved] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [showAnswer, setShowAnswer] = useState(false);
   const [subject, setSubject] = useState('数学');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -85,6 +86,7 @@ export default function Home() {
         setError(data.error);
       } else if (data.grading) {
         setGrading(data.grading);
+        setShowAnswer(false);
         setImageUrl(data.imageUrl || null);
         setLoadingDetail('完成啦');
       } else {
@@ -205,9 +207,24 @@ export default function Home() {
           </div>
           {!grading.is_correct && grading.error_type && <Tag label="订正类型" value={grading.error_type} />}
           {grading.knowledge_point && <Tag label="知识点" value={grading.knowledge_point} />}
-          {!grading.is_correct && grading.error_spot && <Section title="你的订正" content={grading.error_spot} md />}
-          {grading.correct_solution && <Section title="正确答案" content={grading.correct_solution} md />}
-          {grading.analysis && <Section title="为什么错了" content={grading.analysis} md />}
+          {!grading.is_correct && grading.guidance && (
+            <Section title="想一想" content={grading.guidance} />
+          )}
+          {!showAnswer && !grading.is_correct && grading.guidance && (
+            <button
+              onClick={() => setShowAnswer(true)}
+              style={styles.hintBtn}
+            >
+              还是不太懂，给我看看答案 →
+            </button>
+          )}
+          {(showAnswer || !grading.guidance) && (
+            <>
+              {!grading.is_correct && grading.error_spot && <Section title="你的订正" content={grading.error_spot} md />}
+              {grading.correct_solution && <Section title="正确答案" content={grading.correct_solution} md />}
+              {grading.analysis && <Section title="为什么错了" content={grading.analysis} md />}
+            </>
+          )}
           {grading.knowledge_tags.length > 0 && (
             <div style={styles.tags}>{grading.knowledge_tags.map((t, i) => <span key={i} style={styles.tag}>{t}</span>)}</div>
           )}
@@ -254,6 +271,7 @@ const styles: Record<string, React.CSSProperties> = {
   uploadText: { fontSize: '14px', color: '#8e95a2', fontWeight: 500 },
   preview: { maxWidth: '100%', maxHeight: '220px', borderRadius: '12px', objectFit: 'contain' },
   btn: { width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '12px', cursor: 'pointer' },
+  hintBtn: { width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#4f6ef7', background: '#eef1ff', border: '1px solid #d0d8ff', borderRadius: '12px', cursor: 'pointer', marginBottom: '12px' },
   btnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
   btnSaved: { color: '#27ae60', background: '#eafaf1', cursor: 'default' },
   loadingBox: { textAlign: 'center', padding: '40px 20px', color: '#8e95a2' },

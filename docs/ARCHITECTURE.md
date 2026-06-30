@@ -2,7 +2,7 @@
 
 > 项目：作业小帮手
 > 架构风格：单体应用（Next.js 全栈），四层逻辑分层
-> 更新日期：2026-06-28
+> 更新日期：2026-06-30
 
 ---
 
@@ -99,28 +99,30 @@
   ▼
 POST /api/correct (FormData: image)
   │
-  ├─ 校验 ANTHROPIC_API_KEY ──无──▶ 503 明确提示
+  ├─ 校验 session + API Key ──无──▶ 401/503
   ├─ 校验 size < 10MB ──超──▶ 413
-  ├─ getMimeType() 兜底 image.type
   │
   ▼
-anthropic.messages.create (30s timeout)
+Vision Pre-check (Qwen3-VL-8B, 15s timeout)
   │
-  ├─ 成功 ─▶ { result: "四段式批改文本" }
-  └─ 超时/失败 ─▶ 502 区分错误
+  ├─ YES ─▶ Vision Grading (用户选择模型, 120s)
   │
-  ▼
-前端展示 resultBox + spinner 计时
+  └─ NO ─▶ OCR (Tesseract) → Text Grading (Qwen3-32B, 60s)
   │
   ▼
-用户点「存入错题本」
+parseGrading() → 结构化 GradingResult
   │
   ▼
-POST /api/questions (JSON)
+前端展示（两段式）
+  ├─ Phase 1: ✅/❌ + 知识点 + 💡 引导提示
+  ├─ 用户点击「给我看看答案」→ Phase 2
+  └─ Phase 2: 错误之处 + 正确答案 + 错因分析
   │
-  ├─ getSupabase() ──无──▶ 503
-  ├─ 校验 question 非空
-  └─ insert questions 表
+  ▼
+用户点「记下来」
+  │
+  ▼
+POST /api/questions → SQLite questions 表
 ```
 
 ### 4.2 错题查看流程

@@ -13,6 +13,7 @@ export default function Settings() {
   const [message, setMessage] = useState('');
   const [defaultSubject, setDefaultSubject] = useState('数学');
   const [defaultModel, setDefaultModel] = useState('claude-3-5-sonnet-latest');
+  const [mode, setMode] = useState('student');
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginCode, setLoginCode] = useState('');
@@ -45,6 +46,7 @@ export default function Settings() {
       const json = await res.json();
       if (json.defaultSubject) setDefaultSubject(json.defaultSubject);
       if (json.defaultModel) setDefaultModel(json.defaultModel);
+      if (json.mode) setMode(json.mode);
     } catch {}
   };
 
@@ -131,7 +133,7 @@ export default function Settings() {
       const res = await fetch('/api/user/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ defaultSubject, defaultModel }),
+        body: JSON.stringify({ defaultSubject, defaultModel, mode }),
       });
       const json = await res.json();
       setMessage(json.ok ? '已经保存好啦 ✅' : '保存失败');
@@ -277,6 +279,24 @@ export default function Settings() {
           </div>
           <ModelSelector />
 
+          <div style={{ ...styles.settingRow, marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eef0f4' }}>
+            <div>
+              <label style={styles.settingLabel}>使用模式</label>
+              <div style={{ fontSize: '11px', color: '#8e95a2', marginTop: '2px' }}>
+                {mode === 'student' ? '只看趋势汇总，不暴露单题细节' : '可查看全部批改细节'}
+              </div>
+            </div>
+            <button
+              onClick={() => setMode(m => m === 'student' ? 'parent' : 'student')}
+              style={{
+                ...styles.modeToggle,
+                ...(mode === 'parent' ? styles.modeToggleParent : {}),
+              }}
+            >
+              {mode === 'student' ? '👤 学生模式' : '👨‍👩‍👧 家长模式'}
+            </button>
+          </div>
+
           <button onClick={handleSaveSettings} style={styles.primaryBtn}>保存</button>
         </section>
       </div>
@@ -315,4 +335,6 @@ const styles: Record<string, React.CSSProperties> = {
   settingRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
   settingLabel: { fontSize: '13px', fontWeight: 500, color: '#555' },
   select: { padding: '8px 12px', fontSize: '12px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', color: '#333', background: 'white' },
+  modeToggle: { padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#4f6ef7', background: '#eef1ff', border: '1px solid #d0d8ff', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' },
+  modeToggleParent: { color: '#e67e22', background: '#fef9e7', borderColor: '#fce4b3' },
 };

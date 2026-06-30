@@ -4,7 +4,7 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.7.1-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.8.1-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
 [![Tests](https://img.shields.io/badge/tests-66_✓-brightgreen)]()
@@ -30,6 +30,8 @@
 | 🔀 **多学科支持** | 数学/语文/英语多学科切换 | ✅ 已实现 |
 | 🔄 **错题重做** | 重做错题并对照正确答案 | ✅ 已实现 |
 | 🤖 **多模型选择** | 支持 78+ 个 AI 模型切换（含 17 个视觉模型） | ✅ 已实现 |
+| 💡 **两段式批改** | 先引导启发，孩子主动请求后才展示完整答案 | ✅ 已实现（v2.8） |
+| 👤 **隐私模式** | 学生模式仅展示趋势汇总，家长模式可查看单题详情 | ✅ 已实现（v2.8） |
 | 🐳 **Docker 部署** | 一键 Docker Compose 启动，内置 SQLite 数据库 | ✅ 已实现 |
 | 🛡️ **安全加固** | 上传鉴权、加密密钥管理、API 限流、JWT 过期 | ✅ 已实现（v2.7） |
 
@@ -250,12 +252,9 @@ curl http://localhost:3000
 # → HTML 200
 ```
 
-### 腾讯云部署
-
-项目已部署至 `1.116.253.201`（Ubuntu 24.04 + Docker + Nginx 反向代理），
-完整部署运维手册：`http://1.116.253.201/reports/作业小帮手v2.6.2-部署运维操作手册.docx`
-
 ---
+
+
 
 ## 📖 文档索引
 
@@ -295,6 +294,8 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 | 版本 | 日期 | 主要变更 |
 |------|------|----------|
+| v2.8.1 | 2026-06-30 | 🐛 修复 API Key 保存失败（user_settings upsert 主键兼容性问题） |
+| v2.8.0 | 2026-06-30 | 💡 两段式批改（引导→答案）+ 👤 隐私模式（学生/家长双视图）+ 安全清理 |
 | v2.7.2 | 2026-06-30 | 🔑 API Key 用户级隔离，移除共享环境变量 Key |
 | v2.7.1 | 2026-06-30 | 📦 依赖升级：移除废弃 Supabase 包、nodemailer 9.x、漏洞从 8 个降至 4 个 |
 | v2.7.0 | 2026-06-30 | 🔒 安全加固：上传鉴权、加密密钥强制、验证码限流、JWT 过期、测试体系 |

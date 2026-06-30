@@ -4,7 +4,40 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
-## [2.7.2] - 2026-06-30
+## [2.8.1] - 2026-06-30
+
+### 紧急修复
+
+- **API Key 保存失败修复**：`app/api/user/key/route.ts` 和 `app/api/user/settings/route.ts` 中的 upsert 操作改用直接 SQL（`execute`/`queryOne`）替代 QueryBuilder，因为 `user_settings` 表使用 `user_id` 而非 `id` 作为主键，导致 `QueryBuilder.upsert()` 生成的 `INSERT INTO "user_settings" ("id", ...)` 语句执行失败
+- **服务端数据库修复**：执行 `ALTER TABLE user_settings ADD COLUMN mode` 补充 v2.8 新增字段；清除因 upsert 失败写入的 1 行脏数据
+- **代码审计**：确认其他路由（questions/quiz/plans/stats）均使用标准 `id` 主键，不受此问题影响
+
+## [2.8.0] - 2026-06-30
+
+### 两段式批改（先引导、再给答案）
+
+- **`GradingResult` 新增 `guidance` 字段**：`lib/grading.ts` 接口、prompt、解析器同步更新，AI 返回引导提示而非直接给答案
+- **首页交互改造**：`app/page.tsx` 结果区默认展示引导提示和知识点，隐藏完整答案和错因分析；增加"还是不太懂，给我看看答案"按钮
+- **向后兼容**：旧模型返回的 JSON 无 `guidance` 字段时自动降级为直接展示全量
+- **Prompt 升级**：示例从"两位数进位加法"改为"一元一次方程"，面向初中生
+
+### 隐私模式
+
+- **`user_settings` 表新增 `mode` 列**：`'student'`（默认）或 `'parent'`
+- **设置页模式切换**：`app/settings/page.tsx` 新增学生/家长模式切换按钮
+- **成长日记双视图**：`app/history/page.tsx` 学生模式仅展示汇总趋势（做题数/正确率/薄弱知识点），隐藏单题详情/展开/重做；家长模式保留全部功能
+
+### 安全清理
+
+- **`README.md`**：移除"腾讯云部署"章节（含服务器 IP 和 docx 链接）
+- **`gen_deploy_v271.py`**：所有 IP 替换为 `<your-server-ip>` / `<your-domain>` 占位符
+- **`public/`**：删除含服务器信息的 5 个 docx 文件
+
+### 配套更新
+
+- **测试更新**：`__tests__/grading.test.ts` 新增 `guidance` 字段测试用例，全量 68 个测试用例通过
+- **版本号**：`package.json` → `2.8.0`
+- **文档**：新增 `docs/v2.8-ROADMAP.md`，更新 `README.md`
 
 ### API Key 安全隔离
 

@@ -3,16 +3,23 @@ import { parseGrading, gradingToText } from '../lib/grading';
 import type { GradingResult } from '../lib/grading';
 
 describe('parseGrading', () => {
-  it('应正确解析标准 JSON', () => {
-    const raw = '{"is_correct":false,"error_type":"计算失误","knowledge_point":"两位数进位加法","error_spot":"第二步未进位","correct_solution":"27+38=65","analysis":"对进位规则掌握不牢","knowledge_tags":["进位加法","竖式计算"]}';
+  it('应正确解析标准 JSON（含 guidance）', () => {
+    const raw = '{"is_correct":false,"error_type":"计算失误","knowledge_point":"一元一次方程","guidance":"检查一下去括号时符号有没有变对？","error_spot":"第二步未变号","correct_solution":"2x-2=6","analysis":"对去括号时负号处理掌握不牢","knowledge_tags":["去括号","一元一次方程"]}';
     const result = parseGrading(raw);
     expect(result.is_correct).toBe(false);
     expect(result.error_type).toBe('计算失误');
-    expect(result.knowledge_point).toBe('两位数进位加法');
-    expect(result.error_spot).toBe('第二步未进位');
-    expect(result.correct_solution).toBe('27+38=65');
-    expect(result.analysis).toBe('对进位规则掌握不牢');
-    expect(result.knowledge_tags).toEqual(['进位加法', '竖式计算']);
+    expect(result.knowledge_point).toBe('一元一次方程');
+    expect(result.guidance).toBe('检查一下去括号时符号有没有变对？');
+    expect(result.error_spot).toBe('第二步未变号');
+    expect(result.correct_solution).toBe('2x-2=6');
+    expect(result.analysis).toBe('对去括号时负号处理掌握不牢');
+    expect(result.knowledge_tags).toEqual(['去括号', '一元一次方程']);
+  });
+
+  it('guidance 缺失时应填充为空字符串', () => {
+    const raw = '{"is_correct":true,"knowledge_point":"乘法口诀"}';
+    const result = parseGrading(raw);
+    expect(result.guidance).toBe('');
   });
 
   it('应处理全对结果', () => {
@@ -62,6 +69,7 @@ describe('parseGrading', () => {
     expect(result.is_correct).toBe(true);
     expect(result.error_type).toBe('');
     expect(result.knowledge_point).toBe('');
+    expect(result.guidance).toBe('');
     expect(result.error_spot).toBe('');
     expect(result.correct_solution).toBe('');
     expect(result.analysis).toBe('');
@@ -86,6 +94,7 @@ describe('gradingToText', () => {
     is_correct: true,
     error_type: '全部正确',
     knowledge_point: '乘法口诀',
+    guidance: '',
     error_spot: '无',
     correct_solution: '',
     analysis: '完全正确',
@@ -103,6 +112,7 @@ describe('gradingToText', () => {
       is_correct: false,
       error_type: '计算失误',
       knowledge_point: '进位加法',
+      guidance: '想想进位规则',
       error_spot: '第二步未进位',
       correct_solution: '27+38=65',
       analysis: '进位规则不牢',
@@ -112,6 +122,7 @@ describe('gradingToText', () => {
     expect(text).toContain('❌');
     expect(text).toContain('计算失误');
     expect(text).toContain('进位加法');
+    expect(text).toContain('想想进位规则');
     expect(text).toContain('第二步未进位');
     expect(text).toContain('27+38=65');
     expect(text).toContain('进位规则不牢');
@@ -123,6 +134,7 @@ describe('gradingToText', () => {
       is_correct: false,
       error_type: '',
       knowledge_point: '',
+      guidance: '',
       error_spot: '',
       correct_solution: '',
       analysis: '仅分析',

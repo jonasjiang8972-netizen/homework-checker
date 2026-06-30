@@ -43,10 +43,22 @@ export default function History() {
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
   const [filterError, setFilterError] = useState('all');
+  const [mode, setMode] = useState<'student' | 'parent'>('student');
+  const [modeLoaded, setModeLoaded] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
+    fetchMode();
   }, [sortBy, sortOrder, filterSubject, filterError]);
+
+  const fetchMode = async () => {
+    try {
+      const res = await fetch('/api/user/settings');
+      const json = await res.json();
+      if (json.mode) setMode(json.mode);
+    } catch {}
+    setModeLoaded(true);
+  };
 
   const buildQuery = () => {
     const params = new URLSearchParams();
@@ -181,6 +193,62 @@ export default function History() {
             <p style={styles.emptyText}>还没有做过题呢</p>
           <a href="/" style={styles.primaryBtn}>去试试吧 ✨</a>
         </div>
+      ) : mode === 'student' ? (
+        /* 学生模式：只看汇总趋势，不暴露单题细节 */
+        <div style={styles.studentView}>
+          <div style={styles.studentSummary}>
+            <div style={styles.studentStat}>
+              <span style={styles.studentNum}>{totalCount}</span>
+              <span style={styles.studentLabel}>总共做题</span>
+            </div>
+            <div style={styles.studentStat}>
+              <span style={{ ...styles.studentNum, color: '#27ae60' }}>{totalCount > 0 ? Math.round(correctCount / totalCount * 100) : 0}%</span>
+              <span style={styles.studentLabel}>正确率</span>
+            </div>
+            <div style={styles.studentStat}>
+              <span style={{ ...styles.studentNum, color: '#4f6ef7' }}>{questions.filter(q => q.grading?.knowledge_tags?.length).length}</span>
+              <span style={styles.studentLabel}>涉及知识点</span>
+            </div>
+          </div>
+
+          <div style={styles.studentSectionTitle}>薄弱知识点</div>
+          {(() => {
+            const weakKps = [...new Set(questions
+              .filter(q => q.is_correct === false && q.knowledge_point)
+              .map(q => q.knowledge_point!))];
+            return weakKps.length > 0 ? (
+              <div style={styles.weakTags}>
+                {weakKps.map((kp, i) => (
+                  <span key={i} style={styles.weakTag}>{kp}</span>
+                ))}
+              </div>
+            ) : (
+              <p style={styles.studentNone}>暂无薄弱点，继续保持！</p>
+            );
+          })()}
+
+          <div style={styles.studentSectionTitle}>最近记录</div>
+          <ul style={styles.list}>
+            {questions.slice(0, 20).map((q) => (
+              <li key={q.id} style={styles.studentItem}>
+                <div style={styles.itemTop}>
+                  {q.is_correct != null && (
+                    <span style={q.is_correct ? styles.badgeOk : styles.badgeBad}>
+                      {q.is_correct ? '✅' : '❌'}
+                    </span>
+                  )}
+                  {q.subject && q.subject !== '未分类' && (
+                    <span style={styles.subjectTag}>{q.subject}</span>
+                  )}
+                  {q.knowledge_point && (
+                    <span style={styles.tag}>{q.knowledge_point}</span>
+                  )}
+                  <span style={styles.date}>{formatDate(q.created_at)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : (
         <ul style={styles.list}>
           {questions.map((q) => (
@@ -313,4 +381,14 @@ const styles: Record<string, React.CSSProperties> = {
   filterBtn: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '5px 12px', fontSize: '12px', fontWeight: 500, color: '#666', background: '#f0f2f5', border: 'none', borderRadius: '20px', cursor: 'pointer' },
   filterBtnActive: { color: 'white', background: '#4f6ef7' },
   filterCount: { fontSize: '10px', fontWeight: 600, color: 'inherit', opacity: 0.7 },
+  studentView: { padding: '0' },
+  studentSummary: { display: 'flex', gap: '10px', marginBottom: '16px' },
+  studentStat: { flex: 1, textAlign: 'center', padding: '12px 8px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4' },
+  studentNum: { fontSize: '22px', fontWeight: 700, color: '#1a1a2e' },
+  studentLabel: { fontSize: '11px', color: '#8e95a2', marginTop: '2px' },
+  studentSectionTitle: { fontSize: '14px', fontWeight: 600, color: '#1a1a2e', marginBottom: '8px', marginTop: '4px' },
+  studentItem: { padding: '10px 14px', background: 'white', borderRadius: '10px', border: '1px solid #eef0f4', marginBottom: '6px' },
+  weakTags: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' },
+  weakTag: { fontSize: '12px', fontWeight: 500, padding: '4px 10px', borderRadius: '8px', background: '#fff5f5', color: '#d63031', border: '1px solid #ffd5d5' },
+  studentNone: { fontSize: '13px', color: '#8e95a2', marginBottom: '16px' },
 };

@@ -102,6 +102,7 @@ function initSchema(db: SqlJsDatabase) {
       anthropic_key_encrypted TEXT,
       default_subject TEXT DEFAULT '数学',
       default_model TEXT DEFAULT 'claude-3-5-sonnet-latest',
+      mode TEXT DEFAULT 'student',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
