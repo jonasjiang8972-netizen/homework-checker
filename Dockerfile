@@ -35,6 +35,8 @@ RUN mkdir -p /app/public/uploads /app/data && chown nextjs:nodejs /app/public/up
 RUN mkdir -p /app/node_modules/sql.js/dist
 COPY --from=builder /app/node_modules/sql.js/dist/sql-wasm.wasm /app/node_modules/sql.js/dist/sql-wasm.wasm
 
+COPY --from=deps /app/node_modules ./node_modules
+
 USER nextjs
 
 EXPOSE 3000

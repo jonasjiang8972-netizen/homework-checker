@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '请输入正确的邮箱地址' }, { status: 400 });
   }
 
-  if (!process.env.RESEND_API_KEY) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
     return NextResponse.json({ error: '邮件服务未配置，无法发送验证码' }, { status: 503 });
   }
 
