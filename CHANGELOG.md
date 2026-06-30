@@ -4,6 +4,19 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.7.2] - 2026-06-30
+
+### API Key 安全隔离
+
+- **移除共享 API Key 环境变量**：`lib/auth-utils.ts` 中 `getApiKey()` 不再读取 `process.env.ANTHROPIC_API_KEY`，强制每个用户在设置页自行配置独立 Key
+- **数据迁移**：原共享 Key 已加密写入 `jonasjiang8972@gmail.com` 的 `user_settings.anthropic_key_encrypted`，该用户不受影响
+- 未配置 Key 的用户调用批改/计划/测验功能时将提示"请在设置页添加 API Key"
+
+### 安全加固
+
+- 每个用户使用独立的 SiliconFlow API Key，用量和计费完全隔离
+- 无共享 Key 泄露风险，按用户级别可审计
+
 ## [2.7.1] - 2026-06-30
 
 ### 依赖升级

@@ -3,11 +3,6 @@ import { getSupabaseAdmin } from './supabase';
 import { decrypt } from './encryption';
 
 export async function getApiKey(): Promise<string | null> {
-  const envKey = process.env.ANTHROPIC_API_KEY;
-  if (envKey && !envKey.startsWith('your_')) {
-    return envKey;
-  }
-
   const session = await getServerSession();
   if (!session?.user?.email) return null;
 

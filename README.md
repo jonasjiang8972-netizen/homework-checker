@@ -75,8 +75,10 @@ npm run dev
 在 `.env.local` 中配置以下**必填**变量：
 
 ```bash
-# AI API Key（SiliconFlow / 任意 OpenAI 兼容 API）
-ANTHROPIC_API_KEY=sk-your_key_here
+# AI API（每个用户在设置页自行配置，不再使用共享环境变量）
+# ANTHROPIC_API_KEY 已移除 — 请前往应用设置页单独配置
+
+# SiliconFlow API 基础地址（共享）
 ANTHROPIC_BASE_URL=https://api.siliconflow.cn/v1
 ANTHROPIC_MODEL=Qwen/Qwen3-VL-32B-Instruct
 
@@ -98,7 +100,7 @@ API_KEY_ENCRYPTION_SECRET=$(openssl rand -hex 32)
 
 | 密钥 | 获取方式 |
 |------|----------|
-| **ANTHROPIC_API_KEY** | [SiliconFlow 控制台](https://cloud.siliconflow.cn) → API Key |
+| **ANTHROPIC_BASE_URL** | 环境变量配置，指向 API 基础地址 |
 | **SMTP_USER / SMTP_PASS** | Gmail 账户 → 安全 → 两步验证 → 应用专用密码（16 位） |
 | **NEXTAUTH_SECRET** | `openssl rand -hex 32` 生成 |
 | **API_KEY_ENCRYPTION_SECRET** | `openssl rand -hex 32` 生成 |
@@ -293,6 +295,7 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 | 版本 | 日期 | 主要变更 |
 |------|------|----------|
+| v2.7.2 | 2026-06-30 | 🔑 API Key 用户级隔离，移除共享环境变量 Key |
 | v2.7.1 | 2026-06-30 | 📦 依赖升级：移除废弃 Supabase 包、nodemailer 9.x、漏洞从 8 个降至 4 个 |
 | v2.7.0 | 2026-06-30 | 🔒 安全加固：上传鉴权、加密密钥强制、验证码限流、JWT 过期、测试体系 |
 | v2.6.2 | 2026-06-30 | 🛡️ 修复未授权访问漏洞（标题/计划/统计/测验 API） |
