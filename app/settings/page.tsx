@@ -14,6 +14,7 @@ export default function Settings() {
   const [defaultSubject, setDefaultSubject] = useState('数学');
   const [defaultModel, setDefaultModel] = useState('claude-3-5-sonnet-latest');
   const [mode, setMode] = useState('student');
+  const [apiBaseUrl, setApiBaseUrl] = useState('');
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginCode, setLoginCode] = useState('');
@@ -37,6 +38,7 @@ export default function Settings() {
         setKeyStatus('has');
         setMaskedKey(json.maskedKey || '');
       }
+      setApiBaseUrl(json.baseUrl || '');
     } catch {}
   };
 
@@ -47,6 +49,7 @@ export default function Settings() {
       if (json.defaultSubject) setDefaultSubject(json.defaultSubject);
       if (json.defaultModel) setDefaultModel(json.defaultModel);
       if (json.mode) setMode(json.mode);
+      if (json.apiBaseUrl) setApiBaseUrl(json.apiBaseUrl);
     } catch {}
   };
 
@@ -99,7 +102,7 @@ export default function Settings() {
       const res = await fetch('/api/user/key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: apiKey.trim() }),
+        body: JSON.stringify({ apiKey: apiKey.trim(), baseUrl: apiBaseUrl.trim() || undefined }),
       });
       let errorMsg: string | null = null;
       try {
@@ -140,7 +143,7 @@ export default function Settings() {
       const res = await fetch('/api/user/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ defaultSubject, defaultModel, mode }),
+        body: JSON.stringify({ defaultSubject, defaultModel, mode, apiBaseUrl: apiBaseUrl || null }),
       });
       const json = await res.json();
       setMessage(json.ok ? '已经保存好啦 ✅' : '保存失败');
@@ -263,9 +266,28 @@ export default function Settings() {
               保存
             </button>
           </div>
+          <input
+            type="text"
+            value={apiBaseUrl}
+            onChange={e => setApiBaseUrl(e.target.value)}
+            placeholder="API 接口地址（如 https://api.siliconflow.cn/v1）"
+            style={{ ...styles.keyInput, marginBottom: '8px', fontSize: '12px', fontFamily: 'monospace' }}
+          />
           <a href="https://console.anthropic.com" target="_blank" style={styles.extLink}>
             获取 Claude API Key
           </a>
+        </section>
+
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>API 接口地址</h2>
+          <p style={styles.sectionDesc}>如果使用 SiliconFlow，保持默认即可。如需使用其他兼容接口，请填写完整地址（如 https://api.openai.com/v1）。</p>
+          <input
+            type="text"
+            value={apiBaseUrl}
+            onChange={e => setApiBaseUrl(e.target.value)}
+            placeholder="https://api.siliconflow.cn/v1"
+            style={styles.keyInput}
+          />
         </section>
 
         <section style={styles.section}>

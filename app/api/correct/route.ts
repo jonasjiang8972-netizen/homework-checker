@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
 import { retry } from '../../../lib/retry';
-import { getApiKey } from '../../../lib/auth-utils';
+import { getApiKey, getApiBaseUrl } from '../../../lib/auth-utils';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
@@ -17,19 +17,17 @@ const TEXT_TIMEOUT_MS = 60000;
 
 const VISION_PRECHECK_PROMPT = `判断这张图片是否包含可批改的作业题目。包含清晰题目文字回复 YES，否则回复 NO。只回复 YES 或 NO。`;
 
-function getBaseURL(): string {
-  return process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
-}
-
 async function fetchAI(messages: any[], model: string, maxTokens: number, temperature: number, timeoutMs: number): Promise<string> {
   const apiKey = await getApiKey();
   if (!apiKey) throw new Error('No API key');
+
+  const baseURL = (await getApiBaseUrl()) || process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(`${getBaseURL()}/chat/completions`, {
+    const response = await fetch(`${baseURL}/chat/completions`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),

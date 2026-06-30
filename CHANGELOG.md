@@ -4,6 +4,23 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.8.5] - 2026-06-30
+
+### 模型选择修复与 API 地址自定义
+
+- **模型列表获取改用用户独立 Key**：`/api/models` 路由从 `process.env.ANTHROPIC_API_KEY` 改为使用当前登录用户保存在数据库中的 API Key，不再依赖已废弃的共享环境变量
+- **API 接口地址自定义**：设置页新增"API 接口地址"输入框，用户可配置自己的 API 代理地址（如 `https://api.siliconflow.cn/v1`），默认使用 `ANTHROPIC_BASE_URL` 环境变量
+- **`user_settings` 表新增 `base_url` 列**：支持为不同用户配置不同 API 地址，自动兼容已有数据库（ALTER TABLE 迁移）
+- **`POST /api/user/key` 支持 `baseUrl` 字段**：保存 API Key 时可同时提交接口地址，一键配置
+- **`GET /api/user/key` 返回 `baseUrl`**：设置页加载时自动回显已保存的接口地址
+
+### 配套更新
+
+- `lib/db.ts` — 新增 `base_url` 列定义及 ALTER TABLE 迁移
+- `app/api/user/key/route.ts` — POST/GET 增加 base_url 读写，GET 增加 `await getDb()`
+- `app/api/models/route.ts` — 改用用户认证 + 数据库中的 API Key 和 base_url
+- `app/settings/page.tsx` — 新增 API 接口地址输入框
+
 ## [2.8.4] - 2026-06-30
 
 ### 紧急修复

@@ -4,10 +4,10 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.8.4-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.8.5-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-66_✓-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-67_✓-brightgreen)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
@@ -294,6 +294,7 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 | 版本 | 日期 | 主要变更 |
 |------|------|----------|
+| v2.8.5 | 2026-06-30 | 🚀 修复模型列表获取 + 支持自定义 API 接口地址，批改跟随用户配置 |
 | v2.8.4 | 2026-06-30 | 🐛 修复生产环境 API Key 保存失败（移除死代码 Supabase 守卫 + 增加错误提示） |
 | v2.8.1 | 2026-06-30 | 🐛 修复 API Key 保存失败（user_settings upsert 主键兼容性问题） |
 | v2.8.0 | 2026-06-30 | 💡 两段式批改（引导→答案）+ 👤 隐私模式（学生/家长双视图）+ 安全清理 |

@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth';
-import { execute } from '../../../../lib/db';
+import { execute, getDb, queryOne } from '../../../../lib/db';
 import { encrypt, decrypt, maskApiKey } from '../../../../lib/encryption';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -9,18 +9,22 @@ export async function GET() {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  const { queryOne } = await import('../../../../lib/db');
-  const row = queryOne('SELECT anthropic_key_encrypted FROM user_settings WHERE user_id = ?', [session.user.email]);
+  await getDb();
+  const row = queryOne('SELECT anthropic_key_encrypted, base_url FROM user_settings WHERE user_id = ?', [session.user.email]);
 
   if (row?.anthropic_key_encrypted) {
     const decrypted = decrypt(row.anthropic_key_encrypted as string);
     return NextResponse.json({
       configured: true,
       maskedKey: decrypted ? maskApiKey(decrypted) : null,
+      baseUrl: (row.base_url as string) || process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1',
     });
   }
 
-  return NextResponse.json({ configured: false });
+  return NextResponse.json({
+    configured: false,
+    baseUrl: process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1',
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -30,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
     }
 
-    let body: { apiKey?: string };
+    let body: { apiKey?: string; baseUrl?: string };
     try {
       body = await request.json();
     } catch {
@@ -42,14 +46,16 @@ export async function POST(request: NextRequest) {
     }
 
     const encrypted = encrypt(body.apiKey.trim());
+    const baseUrl = body.baseUrl?.trim() || process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
 
+    await getDb();
     execute(
-      `INSERT INTO user_settings (user_id, anthropic_key_encrypted, updated_at) VALUES (?, ?, datetime('now'))
-       ON CONFLICT(user_id) DO UPDATE SET anthropic_key_encrypted = ?, updated_at = datetime('now')`,
-      [session.user.email, encrypted, encrypted],
+      `INSERT INTO user_settings (user_id, anthropic_key_encrypted, base_url, updated_at) VALUES (?, ?, ?, datetime('now'))
+       ON CONFLICT(user_id) DO UPDATE SET anthropic_key_encrypted = ?, base_url = ?, updated_at = datetime('now')`,
+      [session.user.email, encrypted, baseUrl, encrypted, baseUrl],
     );
 
-    return NextResponse.json({ ok: true, maskedKey: maskApiKey(body.apiKey.trim()) });
+    return NextResponse.json({ ok: true, maskedKey: maskApiKey(body.apiKey.trim()), baseUrl });
   } catch (e) {
     const message = e instanceof Error ? e.message : '未知错误';
     return NextResponse.json({ error: `服务器错误: ${message}` }, { status: 500 });
@@ -62,6 +68,7 @@ export async function DELETE() {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
+  await getDb();
   execute(
     'UPDATE user_settings SET anthropic_key_encrypted = NULL, updated_at = datetime(\'now\') WHERE user_id = ?',
     [session.user.email],

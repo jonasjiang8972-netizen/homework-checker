@@ -100,6 +100,7 @@ function initSchema(db: SqlJsDatabase) {
     CREATE TABLE IF NOT EXISTS user_settings (
       user_id TEXT PRIMARY KEY,
       anthropic_key_encrypted TEXT,
+      base_url TEXT DEFAULT 'https://api.siliconflow.cn/v1',
       default_subject TEXT DEFAULT '数学',
       default_model TEXT DEFAULT 'claude-3-5-sonnet-latest',
       mode TEXT DEFAULT 'student',
@@ -114,6 +115,8 @@ function initSchema(db: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_questions_user ON questions(user_id);
     CREATE INDEX IF NOT EXISTS idx_questions_kp ON questions(knowledge_point);
   `);
+
+  try { db.run("ALTER TABLE user_settings ADD COLUMN base_url TEXT DEFAULT 'https://api.siliconflow.cn/v1'"); } catch {}
 }
 
 export function queryAll(sql: string, params: any[] = []): Record<string, any>[] {

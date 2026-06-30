@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { getSupabaseAdmin } from './supabase';
 import { decrypt } from './encryption';
+import { queryOne } from './db';
 
 export async function getApiKey(): Promise<string | null> {
   const session = await getServerSession();
@@ -18,6 +19,14 @@ export async function getApiKey(): Promise<string | null> {
   if (!data?.anthropic_key_encrypted) return null;
 
   return decrypt(data.anthropic_key_encrypted);
+}
+
+export async function getApiBaseUrl(): Promise<string | null> {
+  const session = await getServerSession();
+  if (!session?.user?.email) return null;
+
+  const row = queryOne('SELECT base_url FROM user_settings WHERE user_id = ?', [session.user.email]);
+  return row?.base_url || null;
 }
 
 export async function getUserId(): Promise<string | null> {

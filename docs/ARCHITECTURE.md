@@ -154,7 +154,7 @@ DB 异常   → 通用提示，不泄露 error.message
 ```
 
 ### 5.2 安全边界
-- API Key 仅服务端使用，`ANTHROPIC_API_KEY` 不加 `NEXT_PUBLIC_` 前缀
+- API Key 仅服务端使用，不再依赖环境变量 `ANTHROPIC_API_KEY`，改为每个用户独立配置并加密存储（v2.8.5+ 支持自定义 API Base URL）
 - `error.message` 不直接回传前端
 - 后续应加：速率限制、登录态校验（目前 correct 路由未强制登录）
 

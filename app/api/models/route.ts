@@ -1,3 +1,6 @@
+import { getServerSession } from 'next-auth';
+import { getDb, queryOne } from '../../../lib/db';
+import { decrypt } from '../../../lib/encryption';
 import { NextResponse } from 'next/server';
 
 const VISION_KEYWORDS = ['vl', 'vision', '-v-', 'glm-4.5v', 'image', 'multimodal'];
@@ -28,11 +31,20 @@ function classifyModel(id: string): { is_vision: boolean; is_text: boolean; is_i
 }
 
 export async function GET() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const baseURL = process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
+  const session = await getServerSession();
+  if (!session?.user?.email) {
+    return NextResponse.json({ models: [], error: '请先登录' }, { status: 401 });
+  }
+
+  await getDb();
+  const row = queryOne('SELECT anthropic_key_encrypted, base_url FROM user_settings WHERE user_id = ?', [session.user.email]);
+
+  const encryptedKey = row?.anthropic_key_encrypted as string | null;
+  const apiKey = encryptedKey ? decrypt(encryptedKey) : null;
+  const baseURL = (row?.base_url as string) || process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
 
   if (!apiKey) {
-    return NextResponse.json({ models: [], error: 'API key not configured' });
+    return NextResponse.json({ models: [], error: '请先在设置页配置 API Key' }, { status: 503 });
   }
 
   try {

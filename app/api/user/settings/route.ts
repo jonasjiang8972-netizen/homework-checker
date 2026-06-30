@@ -9,12 +9,13 @@ export async function GET() {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  const row = queryOne('SELECT default_subject, default_model, mode FROM user_settings WHERE user_id = ?', [session.user.email]);
+  const row = queryOne('SELECT default_subject, default_model, mode, base_url FROM user_settings WHERE user_id = ?', [session.user.email]);
 
   return NextResponse.json({
     defaultSubject: row?.default_subject || '数学',
     defaultModel: row?.default_model || 'claude-3-5-sonnet-latest',
     mode: row?.mode || 'student',
+    apiBaseUrl: row?.base_url || null,
   });
 }
 
@@ -24,7 +25,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  let body: { defaultSubject?: string; defaultModel?: string; mode?: string };
+  let body: { defaultSubject?: string; defaultModel?: string; mode?: string; apiBaseUrl?: string };
   try {
     body = await request.json();
   } catch {
@@ -32,11 +33,16 @@ export async function PATCH(request: NextRequest) {
   }
 
   execute(
-    `INSERT INTO user_settings (user_id, default_subject, default_model, mode, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(user_id) DO UPDATE SET default_subject = ?, default_model = ?, mode = ?, updated_at = datetime('now')`,
+    `INSERT INTO user_settings (user_id, default_subject, default_model, mode, base_url, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET
+       default_subject = ?, default_model = ?, mode = ?, base_url = ?, updated_at = datetime('now')`,
     [
-      session.user.email, body.defaultSubject || '数学', body.defaultModel || 'claude-3-5-sonnet-latest', body.mode || 'student',
+      session.user.email,
       body.defaultSubject || '数学', body.defaultModel || 'claude-3-5-sonnet-latest', body.mode || 'student',
+      body.apiBaseUrl || null,
+      body.defaultSubject || '数学', body.defaultModel || 'claude-3-5-sonnet-latest', body.mode || 'student',
+      body.apiBaseUrl || null,
     ],
   );
 
