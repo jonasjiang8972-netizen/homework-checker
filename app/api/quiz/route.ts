@@ -1,35 +1,49 @@
 import { getSupabase } from '../../../lib/supabase';
 import { calculateNewMastery } from '../../../lib/mastery';
-import { getApiKey, getUserId } from '../../../lib/auth-utils';
-import Anthropic from '@anthropic-ai/sdk';
+import { getApiKey, getApiBaseUrl, getUserId } from '../../../lib/auth-utils';
+import { queryOne } from '../../../lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
-const QUIZ_GEN_PROMPT = [
-  '你是一位小学数学教师。请根据给定的知识点出 3 道适合小学生的练习题。',
-  '返回 JSON 格式：',
-  '{',
-  '  "questions": [',
-  '    {"question": "题目内容", "answer": "正确答案（数字或文字）", "hint": "解题提示"}',
-  '  ]',
-  '}',
-  '题目难度适中，题型可包括计算题、应用题。每题独立可作答。',
-  '只返回 JSON，不要输出 JSON 以外的任何文字。',
-].join('\n');
+const SUBJECT_PROMPTS: Record<string, { teacher: string; types: string }> = {
+  '数学': { teacher: '小学数学', types: '题型可包括计算题、应用题' },
+  '语文': { teacher: '小学语文', types: '题型可包括填空、阅读理解、造句' },
+  '英语': { teacher: '小学英语', types: '题型可包括词汇、句型、语法' },
+};
 
-const QUIZ_GRADE_PROMPT = [
-  '你是一位小学数学教师。请批改以下测验答案。',
-  '我会提供题目、正确答案和学生作答，请判断每题对错。',
-  '返回 JSON 格式：',
-  '{',
-  '  "results": [',
-  '    {"index": 0, "correct": true/false, "feedback": "简要点评"}',
-  '  ],',
-  '  "score": 总分（正确题数）,',
-  '  "total": 总题数,',
-  '  "summary": "整体评价"',
-  '}',
-  '只返回 JSON，不要输出 JSON 以外的任何文字。',
-].join('\n');
+function buildGenPrompt(subject: string): string {
+  const cfg = SUBJECT_PROMPTS[subject] || { teacher: '小学', types: '' };
+  return [
+    `你是一位${cfg.teacher}教师。请根据知识点出 3 道练习题。${cfg.types}`,
+    '返回 JSON 格式：',
+    '{"questions": [{"question": "题目内容", "answer": "正确答案", "hint": "解题提示"}]}',
+    '题目难度适中，每题独立可作答。只返回 JSON，不要输出其他文字。',
+  ].join('\n');
+}
+
+function buildGradePrompt(subject: string): string {
+  return [
+    `你是一位${SUBJECT_PROMPTS[subject]?.teacher || '小学'}教师。请批改以下测验答案。`,
+    '我会提供题目、正确答案和学生作答，请判断每题对错。',
+    '返回 JSON 格式：',
+    JSON.stringify({
+      results: [
+        {
+          index: 0,
+          correct: true,
+          feedback: '简要点评',
+          knowledge_point: '涉及的知识点',
+          error_analysis: '错因分析（仅错题）',
+          guidance: '引导提示（仅错题，不要直接给答案）',
+          correct_solution: '正确答案或解法（仅错题）',
+        },
+      ],
+      score: 0,
+      total: 0,
+      summary: '整体评价',
+    }, null, 2),
+    '只返回 JSON，不要输出其他文字。',
+  ].join('\n');
+}
 
 interface QuizQuestion {
   question: string;
@@ -41,6 +55,10 @@ interface QuizResult {
   index: number;
   correct: boolean;
   feedback: string;
+  knowledge_point?: string;
+  error_analysis?: string;
+  guidance?: string;
+  correct_solution?: string;
 }
 
 interface QuizGrade {
@@ -86,6 +104,10 @@ function parseQuizGrade(raw: string): QuizGrade | null {
         index: Number(r.index ?? 0),
         correct: !!r.correct,
         feedback: String(r.feedback ?? ''),
+        knowledge_point: r.knowledge_point ? String(r.knowledge_point) : undefined,
+        error_analysis: r.error_analysis ? String(r.error_analysis) : undefined,
+        guidance: r.guidance ? String(r.guidance) : undefined,
+        correct_solution: r.correct_solution ? String(r.correct_solution) : undefined,
       })) : [],
       score: Number(obj.score ?? 0),
       total: Number(obj.total ?? 0),
@@ -94,6 +116,22 @@ function parseQuizGrade(raw: string): QuizGrade | null {
   } catch {
     return null;
   }
+}
+
+function parseQuestionsJson(raw: any): QuizQuestion[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try { const p = JSON.parse(raw); if (Array.isArray(p)) return p; } catch {}
+  }
+  return [];
+}
+
+function parseAnswersJson(raw: any): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === 'string') {
+    try { const p = JSON.parse(raw); if (Array.isArray(p)) return p.map(String); } catch {}
+  }
+  return [];
 }
 
 async function upsertKnowledgePoint(
@@ -159,7 +197,12 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: '获取测验记录失败' }, { status: 500 });
   }
-  return NextResponse.json({ records: data || [] });
+  const records = (data || []).map((r: any) => ({
+    ...r,
+    questions_json: parseQuestionsJson(r.questions_json),
+    answers_json: parseAnswersJson(r.answers_json),
+  }));
+  return NextResponse.json({ records });
 }
 
 export async function POST(request: NextRequest) {
@@ -186,7 +229,50 @@ export async function POST(request: NextRequest) {
     return handleSubmit(supabase, apiKey, body);
   }
 
+  if (body.action === 'correct') {
+    return handleCorrect(supabase, apiKey, body);
+  }
+
   return handleGenerate(supabase, apiKey, body, userId);
+}
+
+const DEFAULT_QUIZ_MODEL = 'Qwen/Qwen3-32B';
+
+async function fetchAI(prompt: string, apiKey: string, model?: string): Promise<string> {
+  const baseURL = (await getApiBaseUrl()) || process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: model || DEFAULT_QUIZ_MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 3000,
+        temperature: 0.2,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`AI API ${response.status}: ${err.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function getUserSubject(): Promise<string> {
+  const userId = await getUserId();
+  if (!userId) return '数学';
+  const row = queryOne('SELECT default_subject FROM user_settings WHERE user_id = ?', [userId]);
+  return (row?.default_subject as string) || '数学';
 }
 
 async function handleGenerate(
@@ -200,23 +286,15 @@ async function handleGenerate(
     return NextResponse.json({ error: '请指定知识点' }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey, timeout: 60000, baseURL: process.env.ANTHROPIC_BASE_URL });
+  const subject = body.subject || await getUserSubject();
+  const model = body.model || DEFAULT_QUIZ_MODEL;
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 3000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: QUIZ_GEN_PROMPT },
-          { type: 'text', text: `知识点：${knowledgePoint}` },
-        ],
-      }],
-    });
-
-    const textBlock = response.content.find(c => c.type === 'text');
-    const raw = textBlock && 'text' in textBlock ? textBlock.text : '';
+    const raw = await fetchAI(
+      `${buildGenPrompt(subject)}\n知识点：${knowledgePoint}`,
+      apiKey,
+      model,
+    );
     const questions = parseQuizGen(raw);
 
     if (!questions || questions.length === 0) {
@@ -229,7 +307,8 @@ async function handleGenerate(
         user_id: userId,
         plan_id: body.plan_id || null,
         knowledge_point: knowledgePoint,
-        questions_json: questions,
+        subject,
+        questions_json: JSON.stringify(questions),
       })
       .select();
 
@@ -237,7 +316,12 @@ async function handleGenerate(
       return NextResponse.json({ error: '保存测验失败' }, { status: 500 });
     }
 
-    return NextResponse.json({ record: data?.[0] });
+    const record = data?.[0];
+    if (record) {
+      record.questions_json = parseQuestionsJson(record.questions_json);
+    }
+
+    return NextResponse.json({ record });
   } catch (error) {
     const msg = error instanceof Error ? error.message : '未知错误';
     const isTimeout = msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('timed out');
@@ -260,6 +344,7 @@ async function handleSubmit(
 
   const recordId = body.id;
   const answers: string[] = body.answers;
+  const model = body.model || DEFAULT_QUIZ_MODEL;
 
   if (!recordId || !Array.isArray(answers)) {
     return NextResponse.json({ error: '缺少 id 或 answers' }, { status: 400 });
@@ -279,32 +364,23 @@ async function handleSubmit(
     return NextResponse.json({ error: '测验记录不存在' }, { status: 404 });
   }
 
-  const questions: QuizQuestion[] = record.questions_json || [];
+  const questions = parseQuestionsJson(record.questions_json);
   if (questions.length === 0) {
     return NextResponse.json({ error: '该测验没有题目' }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey, timeout: 60000, baseURL: process.env.ANTHROPIC_BASE_URL });
+  const subject = record.subject || '数学';
 
   const gradingPrompt = questions.map((q, i) =>
     `第${i + 1}题：${q.question}\n正确答案：${q.answer}\n学生作答：${answers[i] || '（未作答）'}`
   ).join('\n\n');
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: QUIZ_GRADE_PROMPT },
-          { type: 'text', text: gradingPrompt },
-        ],
-      }],
-    });
-
-    const textBlock = response.content.find(c => c.type === 'text');
-    const raw = textBlock && 'text' in textBlock ? textBlock.text : '';
+    const raw = await fetchAI(
+      `${buildGradePrompt(subject)}\n\n${gradingPrompt}`,
+      apiKey,
+      model,
+    );
     const grade = parseQuizGrade(raw);
 
     if (!grade) {
@@ -316,14 +392,13 @@ async function handleSubmit(
     await supabase
       .from('test_records')
       .update({
-        answers_json: answers,
+        answers_json: JSON.stringify(answers),
         score: grade.score,
         total: grade.total,
         passed,
       })
       .eq('id', recordId);
 
-    const userId = await getUserId();
     const kp = record.knowledge_point;
     if (kp) {
       for (const r of grade.results) {
@@ -340,4 +415,49 @@ async function handleSubmit(
       { status: 502 }
     );
   }
+}
+
+async function handleCorrect(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  apiKey: string,
+  body: any,
+) {
+  const userId = await getUserId();
+  if (!userId) {
+    return NextResponse.json({ error: '请先登录' }, { status: 401 });
+  }
+
+  const recordId = body.id;
+  const corrections: { index: number; correct: boolean }[] = body.corrections;
+  if (!recordId || !Array.isArray(corrections)) {
+    return NextResponse.json({ error: '缺少 id 或 corrections' }, { status: 400 });
+  }
+
+  const { data: record } = await supabase
+    .from('test_records')
+    .select('*')
+    .eq('id', recordId)
+    .single();
+
+  if (!record) {
+    return NextResponse.json({ error: '测验记录不存在' }, { status: 404 });
+  }
+
+  const total = record.total || corrections.length;
+  const score = corrections.filter((c: any) => c.correct).length;
+  const passed = score / total >= 0.7;
+
+  await supabase
+    .from('test_records')
+    .update({ score, passed })
+    .eq('id', recordId);
+
+  const kp = record.knowledge_point;
+  if (kp) {
+    for (const c of corrections) {
+      await upsertKnowledgePoint(supabase, kp, c.correct, userId);
+    }
+  }
+
+  return NextResponse.json({ ok: true, score, total, passed });
 }

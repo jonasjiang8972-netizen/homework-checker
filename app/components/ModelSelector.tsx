@@ -10,19 +10,28 @@ interface ModelInfo {
   is_image_gen: boolean;
 }
 
-export function ModelSelector() {
+export function ModelSelector({ refreshKey = 0 }: { refreshKey?: number }) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [selected, setSelected] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filterVision, setFilterVision] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('selectedModel');
+    setLoading(true);
+    setError('');
     fetch('/api/models')
       .then(r => r.json())
       .then(data => {
+        if (data.error) {
+          setError(data.error);
+          setModels([]);
+          setLoading(false);
+          return;
+        }
         const list = data.models || [];
         setModels(list);
         if (saved && list.some((m: ModelInfo) => m.id === saved)) {
@@ -35,9 +44,10 @@ export function ModelSelector() {
       })
       .catch(() => {
         setModels([]);
+        setError('加载失败');
         setLoading(false);
       });
-  }, []);
+  }, [refreshKey]);
 
   useEffect(() => {
     if (selected) localStorage.setItem('selectedModel', selected);
@@ -53,6 +63,10 @@ export function ModelSelector() {
 
   if (loading) {
     return <div style={styles.button}>🤖 加载模型中...</div>;
+  }
+
+  if (error && models.length === 0) {
+    return <div style={{ ...styles.button, color: '#d63031', borderColor: '#ffd5d5', background: '#fff5f5' }}>⚠️ {error}</div>;
   }
 
   return (

@@ -4,6 +4,52 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.9.0] - 2026-06-30
+
+### 测验系统重构（Quiz v2）
+
+#### JSON 序列化修复
+- **修复测验提交无记录 Bug**：`questions_json` / `answers_json` 在通过 supabase mock → sql.js 存储时被 `.toString()` 转为 `"[object Object]"`，导致 `handleSubmit` 读取时字符串无 `.map()` 方法而崩溃。现改为存取均使用 `JSON.stringify` / `JSON.parse`
+- **兼容旧数据**：新增 `parseQuestionsJson()` / `parseAnswersJson()` 函数，同时处理 Array 和 String 类型，已有乱码数据降级为空数组
+- **GET 接口修复**：`GET /api/quiz` 返回记录前自动解析 JSON 字段
+
+#### 学科适配
+- **动态出题 Prompt**：根据 `user_settings.default_subject` 动态构建教师角色，数学→计算/应用题、语文→阅读/填空/造句、英语→词汇/句型/语法
+- **`test_records` 新增 `subject` 列**：记录每次测验所属学科，自动 ALTER TABLE 迁移
+- **Quiz 页学科标签**：右上角显示当前学科（📐数学/📖语文/🔤英语）
+
+#### AI 批改增强
+- **详细分析返回**：AI 批改结果新增 `knowledge_point`、`error_analysis`、`guidance`、`correct_solution` 字段
+- **结果页展开详情**：每题显示错因分析、引导提示、正确解法、知识点
+
+#### 手动纠错机制
+- **`POST /api/quiz` 新增 `action: 'correct'`**：接收 `corrections[{index, correct}]` 数组，重新计算 score/passed 并更新 knowledge_points mastery
+- **前端纠错交互**：结果页每题增加"纠正"按钮，点击切换正确/错误状态，分数实时重算，保存后持久化
+
+#### 错误恢复与重试
+- **提交失败保留答案**：`handleSubmit` 失败时不重置 `answers` 状态，用户可修正后重试
+- **知识点按钮禁用**：出题中禁用所有知识点按钮防止重复提交
+
+### 协议兼容性修复
+- **`app/api/quiz/route.ts`**：移除 `@anthropic-ai/sdk`，改用 `fetch({baseURL}/chat/completions)` 匹配 SiliconFlow OpenAI 兼容协议
+- **`app/api/plans/route.ts`**：同上修复，使用 `Qwen/Qwen3-32B` 模型
+- 上述两路由之前使用 Anthropic Messages API 格式请求 SiliconFlow，协议不匹配导致始终返回 502 "AI 服务暂时不可用"
+
+### 模型选择器改进
+- **主页添加模型选择器**：`app/page.tsx` 学科栏下方新增 `ModelSelector` 组件，用户无需跳转设置页即可查看和切换模型
+- **设置页自动刷新**：`ModelSelector` 新增 `refreshKey` prop，保存/删除 API Key 后自动重新获取模型列表
+- **错误状态显示**：未配置 API Key 或模型加载失败时显示红色错误提示
+
+### 配置文件
+- **生产环境 SMTP 配置**：`SMTP_USER` / `SMTP_PASS` 填入真实 Gmail 凭据
+- **密钥自动生成**：`NEXTAUTH_SECRET` / `API_KEY_ENCRYPTION_SECRET` 使用 `openssl rand -hex 32` 生成
+- **`NEXTAUTH_URL`**：设为 `http://1.116.253.201:3000`
+
+### 配套更新
+- **版本号**：`package.json` → `2.9.0`
+- **数据库迁移**：`lib/db.ts` 新增 `ALTER TABLE test_records ADD COLUMN subject`
+- **文档**：新增 `docs/v2.9-ROADMAP.md`，更新 `CHANGELOG.md`
+
 ## [2.8.5] - 2026-06-30
 
 ### 模型选择修复与 API 地址自定义

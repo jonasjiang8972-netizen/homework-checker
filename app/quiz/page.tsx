@@ -19,11 +19,23 @@ interface QuizResult {
   index: number;
   correct: boolean;
   feedback: string;
+  knowledge_point?: string;
+  error_analysis?: string;
+  guidance?: string;
+  correct_solution?: string;
+}
+
+interface QuizGrade {
+  results: QuizResult[];
+  score: number;
+  total: number;
+  summary: string;
 }
 
 interface QuizRecord {
   id: string;
   knowledge_point: string;
+  subject?: string;
   questions_json: QuizQuestion[];
   answers_json: string[] | null;
   score: number | null;
@@ -32,20 +44,30 @@ interface QuizRecord {
   created_at: string;
 }
 
+const SUBJECT_ICONS: Record<string, string> = {
+  '数学': '📐',
+  '语文': '📖',
+  '英语': '🔤',
+  '其他': '📚',
+};
+
 export default function Quiz() {
   const [weakPoints, setWeakPoints] = useState<KnowledgePointStat[]>([]);
   const [selectedKp, setSelectedKp] = useState('');
   const [customKp, setCustomKp] = useState('');
+  const [subject, setSubject] = useState('数学');
 
   const [record, setRecord] = useState<QuizRecord | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
-  const [grade, setGrade] = useState<{ results: QuizResult[]; score: number; total: number; summary: string } | null>(null);
+  const [grade, setGrade] = useState<QuizGrade | null>(null);
+  const [correctedResults, setCorrectedResults] = useState<QuizResult[] | null>(null);
   const [passed, setPassed] = useState<boolean | null>(null);
 
   const [loadingKp, setLoadingKp] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
   const [error, setError] = useState('');
 
   const [history, setHistory] = useState<QuizRecord[]>([]);
@@ -54,6 +76,7 @@ export default function Quiz() {
   useEffect(() => {
     fetchWeakPoints();
     fetchHistory();
+    fetchSettings();
     const params = new URLSearchParams(window.location.search);
     const kp = params.get('kp');
     if (kp) {
@@ -61,6 +84,14 @@ export default function Quiz() {
       handleGenerate(kp);
     }
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/user/settings');
+      const json = await res.json();
+      if (json.defaultSubject) setSubject(json.defaultSubject);
+    } catch {}
+  };
 
   const fetchWeakPoints = async () => {
     setLoadingKp(true);
@@ -86,23 +117,27 @@ export default function Quiz() {
     setGenerating(true);
     setError('');
     setGrade(null);
+    setCorrectedResults(null);
     setPassed(null);
     setAnswers([]);
     setRecord(null);
     setQuestions([]);
     try {
+      const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
       const res = await fetch('/api/quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ knowledge_point: kp }),
+        body: JSON.stringify({ knowledge_point: kp, model: savedModel || undefined, subject }),
       });
       const json = await res.json();
       if (json.error) {
         setError(json.error);
       } else if (json.record) {
         setRecord(json.record);
-        setQuestions(json.record.questions_json || []);
-        setAnswers(new Array((json.record.questions_json || []).length).fill(''));
+        const qs = json.record.questions_json || [];
+        setQuestions(qs);
+        setAnswers(new Array(qs.length).fill(''));
+        if (json.record.subject) setSubject(json.record.subject);
       }
     } catch {
       setError('网络错误，请重试');
@@ -115,16 +150,18 @@ export default function Quiz() {
     setSubmitting(true);
     setError('');
     try {
+      const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
       const res = await fetch('/api/quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'submit', id: record.id, answers }),
+        body: JSON.stringify({ action: 'submit', id: record.id, answers, model: savedModel || undefined }),
       });
       const json = await res.json();
       if (json.error) {
         setError(json.error);
       } else {
         setGrade(json.grade);
+        setCorrectedResults(json.grade.results);
         setPassed(json.passed);
         fetchHistory();
         fetchWeakPoints();
@@ -135,14 +172,51 @@ export default function Quiz() {
     setSubmitting(false);
   };
 
+  const toggleCorrection = (index: number) => {
+    if (!correctedResults) return;
+    const next = correctedResults.map(r =>
+      r.index === index ? { ...r, correct: !r.correct } : r
+    );
+    setCorrectedResults(next);
+  };
+
+  const handleSaveCorrection = async () => {
+    if (!record || !correctedResults) return;
+    setCorrecting(true);
+    try {
+      const corrections = correctedResults.map(r => ({ index: r.index, correct: r.correct }));
+      const res = await fetch('/api/quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'correct', id: record.id, corrections }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setGrade({ ...grade!, results: correctedResults, score: json.score, total: json.total });
+        setPassed(json.passed);
+        fetchHistory();
+        fetchWeakPoints();
+      }
+    } catch {}
+    setCorrecting(false);
+  };
+
   const resetQuiz = () => {
     setRecord(null);
     setQuestions([]);
     setAnswers([]);
     setGrade(null);
+    setCorrectedResults(null);
     setPassed(null);
     setError('');
   };
+
+  const displayResults = correctedResults || grade?.results || [];
+  const displayScore = correctedResults
+    ? correctedResults.filter(r => r.correct).length
+    : (grade?.score ?? 0);
+  const displayTotal = grade?.total ?? 0;
+  const displayPassed = passed;
 
   const effectiveKp = customKp.trim() || selectedKp;
 
@@ -150,35 +224,72 @@ export default function Quiz() {
     <div style={styles.page}>
       <div style={styles.header}>
         <h1 style={styles.title}>闯关挑战 🎯</h1>
+        <span style={styles.subjectBadge}>{SUBJECT_ICONS[subject] || '📚'} {subject}</span>
       </div>
 
-      {grade ? (
+      {grade && displayResults.length > 0 ? (
         <div style={styles.resultCard}>
-          <div style={passed ? styles.verdictOk : styles.verdictBad}>
-            {passed ? (
+          <div style={displayPassed ? styles.verdictOk : styles.verdictBad}>
+            {displayPassed ? (
               <span style={styles.verdictRow}><IconCheck /> 闯关成功 🎉</span>
             ) : (
               <span style={styles.verdictRow}><IconAlertTriangle /> 差一点点，再试一次</span>
             )}
           </div>
           <div style={styles.scoreDisplay}>
-            <span style={styles.scoreNum}>{grade.score}</span>
+            <span style={styles.scoreNum}>{displayScore}</span>
             <span style={styles.scoreSep}>/</span>
-            <span style={styles.scoreTotal}>{grade.total}</span>
+            <span style={styles.scoreTotal}>{displayTotal}</span>
           </div>
-          <p style={styles.summary}>{grade.summary}</p>
+          <p style={styles.summary}>{grade?.summary}</p>
+
           <div style={styles.resultList}>
-            {grade.results.map(r => (
-              <div key={r.index} style={{ ...styles.resultItem, background: r.correct ? '#eafaf1' : '#fff5f5' }}>
-                <span style={styles.resultRow}>
-                  {r.correct ? <IconCheck /> : <IconX />}
-                  第{r.index + 1}题
-                </span>
-                <span style={{ color: r.correct ? '#27ae60' : '#d63031', fontSize: '12px' }}>{r.feedback}</span>
+            {displayResults.map(r => (
+              <div key={r.index} style={styles.resultItem}>
+                <div style={{ ...styles.resultHeader, background: r.correct ? '#eafaf1' : '#fff5f5' }}>
+                  <span style={styles.resultRow}>
+                    {r.correct ? <IconCheck /> : <IconX />}
+                    第{r.index + 1}题
+                  </span>
+                  <button
+                    onClick={() => toggleCorrection(r.index)}
+                    style={styles.correctBtn}
+                    title="批改有误？点击切换"
+                  >
+                    {r.correct ? '✅' : '❌'} 纠正
+                  </button>
+                </div>
+                <div style={styles.resultDetail}>
+                  <div style={styles.resultFeedback}>{r.feedback}</div>
+                  {!r.correct && r.error_analysis && (
+                    <div style={styles.detailLine}><strong>错因：</strong>{r.error_analysis}</div>
+                  )}
+                  {!r.correct && r.guidance && (
+                    <div style={styles.detailLine}><strong>提示：</strong>{r.guidance}</div>
+                  )}
+                  {!r.correct && r.correct_solution && (
+                    <div style={styles.detailLine}><strong>正确解法：</strong>{r.correct_solution}</div>
+                  )}
+                  {r.knowledge_point && (
+                    <div style={styles.detailLine}><strong>知识点：</strong>{r.knowledge_point}</div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
-          <button onClick={resetQuiz} style={styles.retryBtn}>再测一次</button>
+
+          <div style={styles.resultActions}>
+            {correctedResults && correctedResults.some((r, i) => r.correct !== grade?.results[i]?.correct) && (
+              <button
+                onClick={handleSaveCorrection}
+                disabled={correcting}
+                style={{ ...styles.saveBtn, ...(correcting ? styles.btnDisabled : {}) }}
+              >
+                {correcting ? '保存中...' : '保存纠正'}
+              </button>
+            )}
+            <button onClick={resetQuiz} style={styles.retryBtn}>再测一次</button>
+          </div>
         </div>
       ) : questions.length > 0 ? (
         <div>
@@ -186,6 +297,7 @@ export default function Quiz() {
             <span style={styles.quizKp}>{record?.knowledge_point}</span>
             <span style={styles.quizCount}>共 {questions.length} 题</span>
           </div>
+          {error && <div style={styles.errorBox}>{error}</div>}
           {questions.map((q, i) => (
             <div key={i} style={styles.questionCard}>
               <div style={styles.questionNum}>第{i + 1}题</div>
@@ -202,9 +314,7 @@ export default function Quiz() {
                 style={styles.answerInput}
               />
               <button
-                onClick={() => {
-                  if (q.hint) alert(q.hint);
-                }}
+                onClick={() => { if (q.hint) alert(q.hint); }}
                 style={styles.hintBtn}
               >提示</button>
             </div>
@@ -242,9 +352,11 @@ export default function Quiz() {
                       <button
                         key={kp.name}
                         onClick={() => { setSelectedKp(kp.name); handleGenerate(kp.name); }}
+                        disabled={generating}
                         style={{
                           ...styles.kpBtn,
                           ...(selectedKp === kp.name ? styles.kpBtnActive : {}),
+                          ...(generating ? styles.btnDisabled : {}),
                         }}
                       >
                         <span style={styles.kpName}>{kp.name}</span>
@@ -263,9 +375,11 @@ export default function Quiz() {
                       <button
                         key={kp.name}
                         onClick={() => { setSelectedKp(kp.name); handleGenerate(kp.name); }}
+                        disabled={generating}
                         style={{
                           ...styles.kpBtn,
                           ...(selectedKp === kp.name ? styles.kpBtnActive : {}),
+                          ...(generating ? styles.btnDisabled : {}),
                         }}
                       >
                         <span style={styles.kpName}>{kp.name}</span>
@@ -343,8 +457,9 @@ export default function Quiz() {
 
 const styles: Record<string, React.CSSProperties> = {
   page: { maxWidth: '480px', margin: '0 auto', padding: '20px 16px 80px', background: '#f8f9fc', minHeight: '100vh' },
-  header: { marginBottom: '16px' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' },
   title: { fontSize: '22px', fontWeight: 700, color: '#1a1a2e', margin: 0 },
+  subjectBadge: { fontSize: '12px', fontWeight: 600, color: '#4f6ef7', background: '#eef1ff', padding: '4px 10px', borderRadius: '8px' },
   sectionLabel: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 600, color: '#555', marginBottom: '10px' },
   emptyHint: { textAlign: 'center', color: '#aaa', fontSize: '14px', padding: '24px' },
   errorBox: { marginBottom: '12px', padding: '12px', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '10px', color: '#d63031', fontSize: '13px' },
@@ -382,19 +497,28 @@ const styles: Record<string, React.CSSProperties> = {
 
   submitBtn: { width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '10px', cursor: 'pointer', marginTop: '8px' },
 
-  resultCard: { padding: '20px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4', textAlign: 'center' },
+  resultCard: { padding: '20px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4' },
   verdictRow: { display: 'inline-flex', alignItems: 'center', gap: '6px' },
-  verdictOk: { fontSize: '18px', fontWeight: 700, color: '#27ae60', marginBottom: '14px', padding: '12px', background: '#eafaf1', borderRadius: '10px' },
-  verdictBad: { fontSize: '18px', fontWeight: 700, color: '#d63031', marginBottom: '14px', padding: '12px', background: '#fff5f5', borderRadius: '10px' },
-  scoreDisplay: { marginBottom: '10px' },
+  verdictOk: { fontSize: '18px', fontWeight: 700, color: '#27ae60', marginBottom: '14px', padding: '12px', background: '#eafaf1', borderRadius: '10px', textAlign: 'center' },
+  verdictBad: { fontSize: '18px', fontWeight: 700, color: '#d63031', marginBottom: '14px', padding: '12px', background: '#fff5f5', borderRadius: '10px', textAlign: 'center' },
+  scoreDisplay: { textAlign: 'center', marginBottom: '10px' },
   scoreNum: { fontSize: '42px', fontWeight: 800, color: '#1a1a2e' },
   scoreSep: { fontSize: '22px', color: '#aaa', margin: '0 4px' },
   scoreTotal: { fontSize: '22px', color: '#aaa' },
-  summary: { fontSize: '13px', color: '#555', lineHeight: '1.5', marginBottom: '14px' },
-  resultList: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px', textAlign: 'left' },
-  resultRow: { display: 'inline-flex', alignItems: 'center', gap: '4px' },
-  resultItem: { display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', alignItems: 'center' },
-  retryBtn: { padding: '10px 24px', fontSize: '14px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '8px', cursor: 'pointer' },
+  summary: { textAlign: 'center', fontSize: '13px', color: '#555', lineHeight: '1.5', marginBottom: '14px' },
+
+  resultList: { display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' },
+  resultItem: { borderRadius: '10px', border: '1px solid #eef0f4', overflow: 'hidden' },
+  resultHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', fontSize: '13px' },
+  resultRow: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 },
+  correctBtn: { fontSize: '11px', padding: '2px 8px', borderRadius: '6px', border: '1px solid #d0d8f0', background: 'white', color: '#4f6ef7', cursor: 'pointer' },
+  resultDetail: { padding: '10px 14px', background: '#fafbfc', fontSize: '12px', lineHeight: '1.6' },
+  resultFeedback: { color: '#555', marginBottom: '6px' },
+  detailLine: { color: '#666', marginTop: '4px' },
+
+  resultActions: { display: 'flex', gap: '8px', justifyContent: 'center' },
+  saveBtn: { padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: 'white', background: '#e67e22', border: 'none', borderRadius: '8px', cursor: 'pointer' },
+  retryBtn: { padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '8px', cursor: 'pointer' },
 
   historySection: { marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #eef0f4' },
   historyItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'white', borderRadius: '8px', marginBottom: '6px', border: '1px solid #eef0f4' },

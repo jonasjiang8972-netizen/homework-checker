@@ -15,6 +15,7 @@ export default function Settings() {
   const [defaultModel, setDefaultModel] = useState('claude-3-5-sonnet-latest');
   const [mode, setMode] = useState('student');
   const [apiBaseUrl, setApiBaseUrl] = useState('');
+  const [modelRefreshKey, setModelRefreshKey] = useState(0);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginCode, setLoginCode] = useState('');
@@ -113,6 +114,7 @@ export default function Settings() {
           setMaskedKey(json.maskedKey);
           setApiKey('');
           setMessage('API Key 已加密保存');
+          setModelRefreshKey(k => k + 1);
           setKeyStatus('none');
           return;
         }
@@ -133,6 +135,7 @@ export default function Settings() {
       setKeyStatus('none');
       setMaskedKey('');
       setMessage('API Key 已删除');
+      setModelRefreshKey(k => k + 1);
     } catch {
       setMessage('删除失败');
     }
@@ -306,7 +309,7 @@ export default function Settings() {
           <div style={styles.settingRow}>
             <label style={styles.settingLabel}>AI 模型</label>
           </div>
-          <ModelSelector />
+          <ModelSelector refreshKey={modelRefreshKey} />
 
           <div style={{ ...styles.settingRow, marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eef0f4' }}>
             <div>

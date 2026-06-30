@@ -1,7 +1,6 @@
 import { getSupabase } from '../../../lib/supabase';
 import { aggregateStats } from '../../../lib/mastery';
-import { getApiKey, getUserId } from '../../../lib/auth-utils';
-import Anthropic from '@anthropic-ai/sdk';
+import { getApiKey, getApiBaseUrl, getUserId } from '../../../lib/auth-utils';
 import { NextRequest, NextResponse } from 'next/server';
 
 async function getWeakPoints(userId: string | null): Promise<string[]> {
@@ -95,23 +94,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '暂无薄弱知识点，多批改几道题再来生成计划' }, { status: 400 });
   }
 
-  const anthropic = new Anthropic({ apiKey, timeout: 60000, baseURL: process.env.ANTHROPIC_BASE_URL });
-
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 3000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: PLAN_PROMPT },
-          { type: 'text', text: `薄弱知识点列表：\n${weakPoints.map(p => `- ${p}`).join('\n')}` },
-        ],
-      }],
-    });
+    const baseURL = (await getApiBaseUrl()) || process.env.ANTHROPIC_BASE_URL || 'https://api.siliconflow.cn/v1';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
 
-    const textBlock = response.content.find(c => c.type === 'text');
-    const raw = textBlock && 'text' in textBlock ? textBlock.text : '';
+    let raw: string;
+    try {
+      const response = await fetch(`${baseURL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'Qwen/Qwen3-32B',
+          messages: [{ role: 'user', content: `${PLAN_PROMPT}\n薄弱知识点列表：\n${weakPoints.map(p => `- ${p}`).join('\n')}` }],
+          max_tokens: 3000,
+          temperature: 0.2,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`AI API ${response.status}: ${err.slice(0, 200)}`);
+      }
+
+      const data = await response.json();
+      raw = data.choices?.[0]?.message?.content || '';
+    } finally {
+      clearTimeout(timer);
+    }
+
     const parsed = parsePlanJson(raw);
 
     if (parsed.length === 0) {

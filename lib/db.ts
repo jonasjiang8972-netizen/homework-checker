@@ -117,6 +117,7 @@ function initSchema(db: SqlJsDatabase) {
   `);
 
   try { db.run("ALTER TABLE user_settings ADD COLUMN base_url TEXT DEFAULT 'https://api.siliconflow.cn/v1'"); } catch {}
+  try { db.run("ALTER TABLE test_records ADD COLUMN subject TEXT DEFAULT '数学'"); } catch {}
 }
 
 export function queryAll(sql: string, params: any[] = []): Record<string, any>[] {

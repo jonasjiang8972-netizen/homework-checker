@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import type { GradingResult } from '../lib/grading';
 import { MarkdownRenderer } from '../lib/markdown-renderer';
+import { ModelSelector } from './components/ModelSelector';
 import { IconCamera, IconCheck, IconX } from '../lib/icons';
 
 const SUBJECTS = ['数学', '语文', '英语', '其他'];
@@ -163,6 +164,9 @@ export default function Home() {
               style={{ ...styles.opt, ...(subject === s ? styles.optActive : {}) }}
             >{s}</button>
           ))}
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          <ModelSelector />
         </div>
       </div>
 
