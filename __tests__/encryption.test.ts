@@ -3,7 +3,7 @@ import { encrypt, decrypt, maskApiKey } from '../lib/encryption';
 
 describe('encrypt / decrypt', () => {
   beforeAll(() => {
-    process.env.NEXTAUTH_SECRET = 'test-secret-for-unit-tests-1234567890';
+    process.env.API_KEY_ENCRYPTION_SECRET = 'test-secret-for-unit-tests-1234567890';
   });
 
   it('加解密应回环正确', () => {
@@ -59,10 +59,10 @@ describe('encrypt / decrypt', () => {
   it('不同密钥解密应失败', () => {
     const original = 'test-key';
     const encrypted = encrypt(original);
-    process.env.NEXTAUTH_SECRET = 'different-secret-for-testing-purposes!!';
+    process.env.API_KEY_ENCRYPTION_SECRET = 'different-secret-for-testing-purposes!!';
     const result = decrypt(encrypted);
     expect(result).toBeNull();
-    process.env.NEXTAUTH_SECRET = 'test-secret-for-unit-tests-1234567890';
+    process.env.API_KEY_ENCRYPTION_SECRET = 'test-secret-for-unit-tests-1234567890';
   });
 });
 

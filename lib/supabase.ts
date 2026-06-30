@@ -174,12 +174,12 @@ export async function uploadImage(bytes: Buffer, filename: string, contentType: 
   const { join } = await import('node:path');
   const crypto = await import('node:crypto');
   try {
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = join(process.cwd(), 'data', 'uploads');
     await mkdir(uploadsDir, { recursive: true });
     const ext = filename.split('.').pop() || 'jpg';
     const name = `${crypto.randomUUID()}.${ext}`;
     await writeFile(join(uploadsDir, name), bytes);
-    return `/uploads/${name}`;
+    return `/api/uploads/${name}`;
   } catch {
     return null;
   }

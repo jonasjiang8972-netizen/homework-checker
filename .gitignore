@@ -14,3 +14,5 @@ tsconfig.tsbuildinfo
 *.tgz
 *.tar.gz
 .coverage
+coverage/
+data/

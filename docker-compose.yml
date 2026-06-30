@@ -11,7 +11,6 @@ services:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
     volumes:
-      - ./uploads:/app/public/uploads
       - ./data:/app/data
     restart: unless-stopped
     healthcheck:

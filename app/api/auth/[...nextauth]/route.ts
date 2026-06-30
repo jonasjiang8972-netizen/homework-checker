@@ -34,7 +34,7 @@ const handler = NextAuth({
     }),
   ],
   adapter: getAdapter(),
-  session: { strategy: 'jwt' },
+  session: { strategy: 'jwt', maxAge: 24 * 60 * 60 },
   pages: { signIn: '/settings' },
   callbacks: {
     async jwt({ token, user }) {

@@ -94,7 +94,10 @@ ANTHROPIC_BASE_URL=https://api.siliconflow.cn/v1
 ANTHROPIC_MODEL=Qwen/Qwen3-VL-32B-Instruct
 
 # 邮件服务（验证码登录）
-RESEND_API_KEY=re_xxxxxxxxxxxx
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_16_char_app_password
 
 # NextAuth 配置
 NEXTAUTH_SECRET=your_nextauth_secret

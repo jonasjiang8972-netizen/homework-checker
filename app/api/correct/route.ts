@@ -103,12 +103,12 @@ export async function POST(request: NextRequest) {
 
   let imageUrl: string | null = null;
   try {
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = join(process.cwd(), 'data', 'uploads');
     await mkdir(uploadsDir, { recursive: true });
     const ext = image.name.split('.').pop() || 'jpg';
     const filename = `${crypto.randomUUID()}.${ext}`;
     await writeFile(join(uploadsDir, filename), bytes);
-    imageUrl = `/uploads/${filename}`;
+    imageUrl = `/api/uploads/${filename}`;
   } catch {}
 
   try {
