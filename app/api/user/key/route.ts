@@ -1,12 +1,17 @@
 import { getServerSession } from 'next-auth';
 import { execute, getDb, queryOne } from '../../../../lib/db';
 import { encrypt, decrypt, maskApiKey } from '../../../../lib/encryption';
+import { checkRateLimit, getClientIp } from '../../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session?.user?.email) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('user-key', getClientIp(request), 20, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   await getDb();
@@ -32,6 +37,10 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession();
     if (!session?.user?.email) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
+    }
+
+    if (!checkRateLimit('user-key', session.user.email, 10, 60_000)) {
+      return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
     }
 
     let body: { apiKey?: string; baseUrl?: string };
@@ -62,10 +71,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   const session = await getServerSession();
   if (!session?.user?.email) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('user-key', session.user.email, 5, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   await getDb();

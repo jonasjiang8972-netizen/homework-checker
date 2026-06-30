@@ -1,6 +1,7 @@
 import { getSupabase } from '../../../lib/supabase';
 import { calculateNewMastery } from '../../../lib/mastery';
 import { getApiKey, getApiBaseUrl, getUserId } from '../../../lib/auth-utils';
+import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { queryOne } from '../../../lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -178,7 +179,7 @@ async function upsertKnowledgePoint(
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ records: [], warning: '未配置数据库' });
@@ -187,6 +188,10 @@ export async function GET() {
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: '请先登录后再查看测验记录' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('quiz', getClientIp(request), 20, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   let query = supabase.from('test_records').select('*').eq('user_id', userId);
@@ -209,6 +214,10 @@ export async function POST(request: NextRequest) {
   const apiKey = await getApiKey();
   if (!apiKey) {
     return NextResponse.json({ error: '未配置 Claude API Key，请在设置页添加或配置环境变量' }, { status: 503 });
+  }
+
+  if (!checkRateLimit('quiz', getClientIp(request), 15, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
 
   const supabase = getSupabase();

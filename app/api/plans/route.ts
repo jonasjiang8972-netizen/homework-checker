@@ -1,6 +1,7 @@
 import { getSupabase } from '../../../lib/supabase';
 import { aggregateStats } from '../../../lib/mastery';
 import { getApiKey, getApiBaseUrl, getUserId } from '../../../lib/auth-utils';
+import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
 async function getWeakPoints(userId: string | null): Promise<string[]> {
@@ -52,7 +53,7 @@ function parsePlanJson(raw: string): Array<{
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   if (!supabase) {
     return NextResponse.json({ plans: [], warning: '未配置数据库' });
@@ -61,6 +62,10 @@ export async function GET() {
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: '请先登录后再查看学习计划' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('plans', getClientIp(request), 20, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   let query = supabase.from('study_plans').select('*').eq('user_id', userId);
@@ -81,6 +86,10 @@ export async function POST(request: NextRequest) {
       { error: '未配置 Claude API Key，请在设置页添加或配置环境变量' },
       { status: 503 }
     );
+  }
+
+  if (!checkRateLimit('plans', getClientIp(request), 5, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
 
   const supabase = getSupabase();
@@ -169,6 +178,10 @@ export async function PATCH(request: NextRequest) {
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: '请先登录后再更新学习计划' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('plans', getClientIp(request), 20, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   let body: { id?: string; status?: string };

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
 import { retry } from '../../../lib/retry';
 import { getApiKey, getApiBaseUrl } from '../../../lib/auth-utils';
+import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
@@ -80,6 +81,10 @@ export async function POST(request: NextRequest) {
   const session = await getServerSession();
   if (!session?.user?.email) {
     return NextResponse.json({ error: '请先登录后再使用批改功能' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('correct', getClientIp(request), 10, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
 
   const apiKey = await getApiKey();

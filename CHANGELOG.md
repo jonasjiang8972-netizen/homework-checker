@@ -4,6 +4,42 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.9.1] - 2026-06-30
+
+### 安全加固（Security Hardening）
+
+#### Rate Limiting 全 API 覆盖
+- **新增 `lib/rate-limit.ts`**：基于内存的通用限流器，支持 namespace + key 双维度，每分钟自动清理过期条目
+- **所有 API 路由接入限流**：
+
+| 路由 | 限流策略 |
+|------|---------|
+| `POST /api/auth/send-code` | IP: 5/60s + 邮箱: 3/300s |
+| `POST /api/correct` | 10/60s（AI 批改，防止滥用） |
+| `GET /api/models` | 30/60s |
+| `POST /api/quiz` (出题/批改) | 15/60s |
+| `GET /api/quiz` (历史) | 20/60s |
+| `POST /api/plans` (生成计划) | 5/60s（AI 调用，频率最低） |
+| `GET/PATCH /api/plans` | 20/60s |
+| `GET/POST/DELETE /api/user/key` | 10/60s |
+| `GET/PATCH /api/user/settings` | 20/60s |
+| `GET/POST /api/questions` | 20/60s |
+| `GET/DELETE /api/questions/[id]` | 20/60s |
+| `GET /api/uploads/[file]` | 60/60s |
+| `GET /api/stats` | 20/60s |
+
+#### HTTP 安全响应头
+- **`next.config.js` 新增安全头配置**：
+  - `X-Content-Type-Options: nosniff` — 防止 MIME 类型嗅探
+  - `X-Frame-Options: DENY` — 防止点击劫持
+  - `Referrer-Policy: strict-origin-when-cross-origin` — 控制 referer 泄露
+- **`poweredByHeader: false`** — 移除 `X-Powered-By: Next.js` 指纹信息
+
+#### 配套更新
+- **版本号**：`package.json` → `2.9.1`
+- **文档**：更新 `CHANGELOG.md`
+- **代码清理**：`app/api/auth/send-code/route.ts` 移除旧的本地限流实现，改用共享 `lib/rate-limit.ts`
+
 ## [2.9.0] - 2026-06-30
 
 ### 测验系统重构（Quiz v2）

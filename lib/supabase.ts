@@ -152,6 +152,30 @@ class QueryBuilder {
   upsert(obj: Row, opts?: { onConflict?: string }) {
     return { then: (resolve: (v: any) => any) => this.upsertExec(obj, opts?.onConflict).then(resolve) };
   }
+
+  private async deleteExec(): Promise<{ data: null; error: any }> {
+    try {
+      await getDb();
+      const where = this.buildWhere();
+      const sql = `DELETE FROM "${this.table}"${where}`;
+      execute(sql, this.params);
+      return { data: null, error: null };
+    } catch (e) {
+      return { data: null, error: { message: String(e) } };
+    }
+  }
+
+  delete() {
+    const builder = this;
+    const chain: any = {};
+    chain.eq = (field: string, value: any) => {
+      builder.filters.push(`"${field}" = ?`);
+      builder.params.push(value);
+      return chain;
+    };
+    chain.then = (resolve: (v: any) => any) => builder.deleteExec().then(resolve);
+    return chain;
+  }
 }
 
 class SupabaseMock {

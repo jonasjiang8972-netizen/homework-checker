@@ -1,6 +1,7 @@
 import { getSupabase } from '../../../lib/supabase';
 import { aggregateStats } from '../../../lib/mastery';
 import { getUserId } from '../../../lib/auth-utils';
+import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -12,6 +13,10 @@ export async function GET(request: NextRequest) {
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ error: '请先登录后再查看学习统计' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('stats', getClientIp(request), 20, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -29,7 +34,5 @@ export async function GET(request: NextRequest) {
   }
 
   const stats = aggregateStats(data || []);
-  const weakPoints = stats.filter(s => s.weak).map(s => s.name);
-
-  return NextResponse.json({ stats, weakPoints });
+  return NextResponse.json({ stats });
 }

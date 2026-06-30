@@ -1,30 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendVerificationCode } from '../../../../lib/email';
+import { checkRateLimit, getClientIp } from '../../../../lib/rate-limit';
 
 const codeStore = new Map<string, { code: string; expires: number }>();
-const rateLimit = new Map<string, { count: number; resetAt: number }>();
 
 setInterval(() => {
   const now = Date.now();
   for (const [email, entry] of codeStore) {
     if (now > entry.expires) codeStore.delete(email);
   }
-  for (const [key, entry] of rateLimit) {
-    if (now > entry.resetAt) rateLimit.delete(key);
-  }
 }, 60_000);
-
-function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = rateLimit.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimit.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-  if (entry.count >= maxRequests) return false;
-  entry.count++;
-  return true;
-}
 
 export async function POST(request: NextRequest) {
   let body: { email?: string };
@@ -43,11 +28,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '邮件服务未配置，无法发送验证码' }, { status: 503 });
   }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  if (!checkRateLimit(`ip:${ip}`, 5, 60_000)) {
+  const ip = getClientIp(request);
+  if (!checkRateLimit('send-code', `ip:${ip}`, 5, 60_000)) {
     return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
-  if (!checkRateLimit(`email:${email}`, 3, 300_000)) {
+  if (!checkRateLimit('send-code', `email:${email}`, 3, 300_000)) {
     return NextResponse.json({ error: '该邮箱已发送多次验证码，请5分钟后再试' }, { status: 429 });
   }
 

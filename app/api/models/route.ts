@@ -1,7 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { getDb, queryOne } from '../../../lib/db';
 import { decrypt } from '../../../lib/encryption';
-import { NextResponse } from 'next/server';
+import { checkRateLimit } from '../../../lib/rate-limit';
+import { NextRequest, NextResponse } from 'next/server';
 
 const VISION_KEYWORDS = ['vl', 'vision', '-v-', 'glm-4.5v', 'image', 'multimodal'];
 const EXCLUDE_KEYWORDS = ['embedding', 'reranker', 'audio', 'tts', 'asr', 'cosyvoice', 'sensevoice'];
@@ -30,10 +31,14 @@ function classifyModel(id: string): { is_vision: boolean; is_text: boolean; is_i
   return { is_vision: is_vision || is_image_gen, is_text, is_image_gen };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session?.user?.email) {
     return NextResponse.json({ models: [], error: '请先登录' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('models', session.user.email, 30, 60_000)) {
+    return NextResponse.json({ models: [], error: '操作太频繁' }, { status: 429 });
   }
 
   await getDb();

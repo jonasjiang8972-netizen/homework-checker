@@ -1,12 +1,16 @@
 import { getServerSession } from 'next-auth';
-import { getSupabaseAdmin } from '../../../../lib/supabase';
 import { execute, queryOne } from '../../../../lib/db';
+import { checkRateLimit, getClientIp } from '../../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session?.user?.email) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('user-settings', session.user.email, 20, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   const row = queryOne('SELECT default_subject, default_model, mode, base_url FROM user_settings WHERE user_id = ?', [session.user.email]);
@@ -23,6 +27,10 @@ export async function PATCH(request: NextRequest) {
   const session = await getServerSession();
   if (!session?.user?.email) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
+  }
+
+  if (!checkRateLimit('user-settings', session.user.email, 20, 60_000)) {
+    return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
   let body: { defaultSubject?: string; defaultModel?: string; mode?: string; apiBaseUrl?: string };

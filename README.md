@@ -4,7 +4,7 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.9.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.9.1-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
 [![Tests](https://img.shields.io/badge/tests-67_✓-brightgreen)]()
@@ -294,6 +294,7 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 | 版本 | 日期 | 主要变更 |
 |------|------|----------|
+| v2.9.1 | 2026-06-30 | 🛡️ 全 API Rate Limiting + HTTP 安全头 + X-Powered-By 移除 |
 | v2.9.0 | 2026-06-30 | 🧪 测验系统重构：学科适配、AI 批改增强、手动纠错、JSON 序列化修复、模型选择器改进 |
 | v2.8.5 | 2026-06-30 | 🚀 修复模型列表获取 + 支持自定义 API 接口地址，批改跟随用户配置 |
 | v2.8.4 | 2026-06-30 | 🐛 修复生产环境 API Key 保存失败（移除死代码 Supabase 守卫 + 增加错误提示） |
