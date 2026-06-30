@@ -4,7 +4,7 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.7.1-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
 [![Tests](https://img.shields.io/badge/tests-66_✓-brightgreen)]()
@@ -293,6 +293,7 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 | 版本 | 日期 | 主要变更 |
 |------|------|----------|
+| v2.7.1 | 2026-06-30 | 📦 依赖升级：移除废弃 Supabase 包、nodemailer 9.x、漏洞从 8 个降至 4 个 |
 | v2.7.0 | 2026-06-30 | 🔒 安全加固：上传鉴权、加密密钥强制、验证码限流、JWT 过期、测试体系 |
 | v2.6.2 | 2026-06-30 | 🛡️ 修复未授权访问漏洞（标题/计划/统计/测验 API） |
 | v2.6.0 | 2026-06-29 | 🏗️ SiliconFlow 平台、SQLite 数据库、视觉 AI 批改、强制登录 |

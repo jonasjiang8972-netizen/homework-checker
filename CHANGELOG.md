@@ -4,6 +4,18 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.7.1] - 2026-06-30
+
+### 依赖升级
+
+- **移除废弃包**：`@auth/supabase-adapter`、`@supabase/supabase-js`（项目已使用 SQLite，Supabase 适配器不再需要）
+- **nodemailer**：`^7.0.13` → `^9.0.1`，修复 6 个高/中危 CVE（SMTP 注入、CRLF 注入、SSRF 等）
+- **npm audit 结果**：漏洞数量从 **8 个降至 4 个**（均为 next 传递依赖的 moderate 级，fix 需 breaking change 不可行）
+
+### 代码清理
+
+- `app/api/auth/[...nextauth]/route.ts`：移除 `SupabaseAdapter` 导入和 `getAdapter()` 函数，NextAuth 配置简化
+
 ## [2.7.0] - 2026-06-30
 
 ### 安全加固（Security Hardening）
