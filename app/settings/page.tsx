@@ -101,17 +101,24 @@ export default function Settings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: apiKey.trim() }),
       });
-      const json = await res.json();
-      if (json.error) {
-        setMessage(json.error);
-      } else {
-        setKeyStatus('has');
-        setMaskedKey(json.maskedKey);
-        setApiKey('');
-        setMessage('API Key 已加密保存');
+      let errorMsg: string | null = null;
+      try {
+        const json = await res.json();
+        errorMsg = json.error || null;
+        if (!errorMsg) {
+          setKeyStatus('has');
+          setMaskedKey(json.maskedKey);
+          setApiKey('');
+          setMessage('API Key 已加密保存');
+          setKeyStatus('none');
+          return;
+        }
+      } catch {
+        errorMsg = `HTTP ${res.status} ${res.statusText}`;
       }
-    } catch {
-      setMessage('保存失败');
+      setMessage(errorMsg);
+    } catch (e) {
+      setMessage(`网络错误: ${e instanceof Error ? e.message : '请求失败'}`);
     }
     setKeyStatus('none');
   };

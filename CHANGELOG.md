@@ -4,6 +4,24 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.8.4] - 2026-06-30
+
+### 紧急修复
+
+- **生产环境 API Key 保存失败修复**：`app/api/user/key/route.ts` POST 处理器调用了未 import 的 `getSupabaseAdmin()`，导致运行时 `ReferenceError`，仅在 Production 构建中由于 Tree Shaking 差异才暴露；同时该检查守卫了本不依赖 Supabase 的本地 SQLite 写入流程
+- **移除死代码**：删除未被使用的 `getAuth()` 函数和 `generateId` import
+- **增强错误提示**：POST 处理器增加 try-catch 返回具体错误信息；客户端 `handleSaveKey` 改进错误解析，网络/HTTP 错误直接展示状态码和原因
+- **环境变量补全**：`.env.local` 与 `.env.example` 对齐，新增 `API_KEY_ENCRYPTION_SECRET`、`NEXTAUTH_SECRET`、`NEXTAUTH_URL`、SMTP 等必须变量
+
+### 完整变更记录
+
+- `app/api/user/key/route.ts` — 移除 `getSupabaseAdmin()` 调用（未 import 且系死代码守卫）
+- `app/api/user/key/route.ts` — 移除 `getAuth()` 函数和 `generateId` import
+- `app/api/user/key/route.ts` — POST 增加外层 try-catch 返回 `服务器错误: {错误详情}`
+- `app/settings/page.tsx` — `handleSaveKey` 增加 HTTP 状态码显示和非 JSON 响应兜底
+- `.env.local` — 补全 `API_KEY_ENCRYPTION_SECRET`、`NEXTAUTH_SECRET`、`NEXTAUTH_URL`、SMTP 变量
+- `package.json` — v2.8.1 → v2.8.4
+
 ## [2.8.1] - 2026-06-30
 
 ### 紧急修复
