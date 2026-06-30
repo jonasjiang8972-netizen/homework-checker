@@ -46,8 +46,8 @@ function isRetryableError(error: Error): boolean {
   return (
     msg.includes('timeout') ||
     msg.includes('timed out') ||
-    msg.includes('ECONNREFUSED') ||
-    msg.includes('ECONNRESET') ||
+    msg.includes('econnrefused') ||
+    msg.includes('econnreset') ||
     status === 429 ||
     status === 502 ||
     status === 503 ||
