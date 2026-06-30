@@ -10,6 +10,10 @@ export async function GET(request: NextRequest) {
   }
 
   const userId = await getUserId();
+  if (!userId) {
+    return NextResponse.json({ error: '请先登录后再查看题目记录' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const sortBy = searchParams.get('sort_by') || 'created_at';
   const order = searchParams.get('order') || 'desc';
@@ -17,11 +21,7 @@ export async function GET(request: NextRequest) {
   const filterError = searchParams.get('filter_error');
   const filterSubject = searchParams.get('filter_subject');
 
-  let query = supabase.from('questions').select('*');
-
-  if (userId) {
-    query = query.eq('user_id', userId);
-  }
+  let query = supabase.from('questions').select('*').eq('user_id', userId);
   if (filterKp) {
     query = query.eq('knowledge_point', filterKp);
   }

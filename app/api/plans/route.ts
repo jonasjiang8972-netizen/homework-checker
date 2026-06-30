@@ -60,10 +60,11 @@ export async function GET() {
   }
 
   const userId = await getUserId();
-  let query = supabase.from('study_plans').select('*');
-  if (userId) {
-    query = query.eq('user_id', userId);
+  if (!userId) {
+    return NextResponse.json({ error: '请先登录后再查看学习计划' }, { status: 401 });
   }
+
+  let query = supabase.from('study_plans').select('*').eq('user_id', userId);
   query = query.order('created_at', { ascending: false });
 
   const { data, error } = await query;
@@ -154,6 +155,9 @@ export async function PATCH(request: NextRequest) {
   }
 
   const userId = await getUserId();
+  if (!userId) {
+    return NextResponse.json({ error: '请先登录后再更新学习计划' }, { status: 401 });
+  }
 
   let body: { id?: string; status?: string };
   try {
@@ -174,11 +178,8 @@ export async function PATCH(request: NextRequest) {
   let query = supabase
     .from('study_plans')
     .update({ status: body.status })
-    .eq('id', body.id);
-
-  if (userId) {
-    query = query.eq('user_id', userId);
-  }
+    .eq('id', body.id)
+    .eq('user_id', userId);
 
   const { error } = await query;
 

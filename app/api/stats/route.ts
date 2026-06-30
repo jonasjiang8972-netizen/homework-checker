@@ -10,14 +10,14 @@ export async function GET(request: NextRequest) {
   }
 
   const userId = await getUserId();
+  if (!userId) {
+    return NextResponse.json({ error: '请先登录后再查看学习统计' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const subject = searchParams.get('subject');
 
-  let query = supabase.from('questions').select('knowledge_point, is_correct, subject');
-
-  if (userId) {
-    query = query.eq('user_id', userId);
-  }
+  let query = supabase.from('questions').select('knowledge_point, is_correct, subject').eq('user_id', userId);
   if (subject && subject !== '全部') {
     query = query.eq('subject', subject);
   }

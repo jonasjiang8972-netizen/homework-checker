@@ -147,10 +147,11 @@ export async function GET() {
   }
 
   const userId = await getUserId();
-  let query = supabase.from('test_records').select('*');
-  if (userId) {
-    query = query.eq('user_id', userId);
+  if (!userId) {
+    return NextResponse.json({ error: '请先登录后再查看测验记录' }, { status: 401 });
   }
+
+  let query = supabase.from('test_records').select('*').eq('user_id', userId);
   query = query.order('created_at', { ascending: false });
 
   const { data, error } = await query;
@@ -252,6 +253,11 @@ async function handleSubmit(
   apiKey: string,
   body: any,
 ) {
+  const userId = await getUserId();
+  if (!userId) {
+    return NextResponse.json({ error: '请先登录后再提交测验' }, { status: 401 });
+  }
+
   const recordId = body.id;
   const answers: string[] = body.answers;
 
@@ -264,6 +270,10 @@ async function handleSubmit(
     .select('*')
     .eq('id', recordId)
     .single();
+
+  if (record && record.user_id && record.user_id !== userId) {
+    return NextResponse.json({ error: '无权操作该测验记录' }, { status: 403 });
+  }
 
   if (!record) {
     return NextResponse.json({ error: '测验记录不存在' }, { status: 404 });
