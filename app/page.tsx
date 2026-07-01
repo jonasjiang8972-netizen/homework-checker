@@ -18,7 +18,7 @@ export default function Home() {
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
   const [slowWarning, setSlowWarning] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savedQuestionId, setSavedQuestionId] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [subject, setSubject] = useState('数学');
@@ -65,6 +65,7 @@ export default function Home() {
     if (!rawFile) return;
 
     setLoading(true); setGrading(null); setError(''); setSaved(false); setSlowWarning(false);
+    setSavedQuestionId(null);
     startTimer();
     setLoadingDetail('正在准备图片...');
 
@@ -104,7 +105,7 @@ export default function Home() {
     if (!grading) return;
     setSaved(true);
     try {
-      await fetch('/api/questions', {
+      const res = await fetch('/api/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -115,6 +116,8 @@ export default function Home() {
           grading,
         }),
       });
+      const json = await res.json();
+      if (json.data?.id) setSavedQuestionId(json.data.id);
     } catch {}
   };
 
@@ -174,6 +177,18 @@ export default function Home() {
         <div style={styles.loadingBox}>
           <div style={styles.spinner} />
           <div style={styles.loadingText}>{loadingDetail} {elapsed}s</div>
+          {loadingDetail.includes('检查') && (
+            <div style={styles.loadingSub}>AI 正在确认图片是否清晰可读</div>
+          )}
+          {loadingDetail.includes('AI批改') && elapsed < 5 && (
+            <div style={styles.loadingSub}>AI 正在仔细看你的题目...</div>
+          )}
+          {loadingDetail.includes('AI批改') && elapsed >= 5 && elapsed < 15 && (
+            <div style={styles.loadingSub}>正在分析解题过程，请稍等~</div>
+          )}
+          {loadingDetail.includes('AI批改') && elapsed >= 15 && (
+            <div style={styles.loadingSub}>这道题有点复杂，AI 还在思考中...</div>
+          )}
           {slowWarning && (
             <div style={styles.slowWarning}>处理时间较长，AI 正在努力批改中...</div>
           )}
@@ -229,6 +244,14 @@ export default function Home() {
               {grading.analysis && <Section title="为什么错了" content={grading.analysis} md />}
             </>
           )}
+          {showAnswer && !grading.is_correct && (
+            <button
+              onClick={() => setShowAnswer(false)}
+              style={styles.collapseBtn}
+            >
+              收起答案，我再想想 ↑
+            </button>
+          )}
           {grading.knowledge_tags.length > 0 && (
             <div style={styles.tags}>{grading.knowledge_tags.map((t, i) => <span key={i} style={styles.tag}>{t}</span>)}</div>
           )}
@@ -237,6 +260,18 @@ export default function Home() {
             disabled={saved}
             style={{ ...styles.btn, ...(saved ? styles.btnSaved : {}), marginTop: '12px' }}
           >{saved ? '已记下来 📖' : '记下来 📖'}</button>
+          {saved && grading && !grading.is_correct && grading.knowledge_point && (
+            <div style={styles.nextActions}>
+              <a href={`/quiz?kp=${encodeURIComponent(grading.knowledge_point)}`} style={styles.nextActionBtn}>
+                📝 做同类题巩固一下
+              </a>
+              {savedQuestionId && (
+                <a href={`/redo/${savedQuestionId}`} style={{ ...styles.nextActionBtn, background: '#27ae60' }}>
+                  🔄 重新做这道题
+                </a>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -276,11 +311,13 @@ const styles: Record<string, React.CSSProperties> = {
   preview: { maxWidth: '100%', maxHeight: '220px', borderRadius: '12px', objectFit: 'contain' },
   btn: { width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '12px', cursor: 'pointer' },
   hintBtn: { width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#4f6ef7', background: '#eef1ff', border: '1px solid #d0d8ff', borderRadius: '12px', cursor: 'pointer', marginBottom: '12px' },
+  collapseBtn: { width: '100%', padding: '10px', fontSize: '13px', fontWeight: 500, color: '#8e95a2', background: '#f8f9fc', border: '1px solid #eef0f4', borderRadius: '12px', cursor: 'pointer', marginTop: '8px' },
   btnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
   btnSaved: { color: '#27ae60', background: '#eafaf1', cursor: 'default' },
   loadingBox: { textAlign: 'center', padding: '40px 20px', color: '#8e95a2' },
   spinner: { width: '32px', height: '32px', borderRadius: '50%', border: '3px solid #eef0f4', borderTopColor: '#4f6ef7', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' },
   loadingText: { fontSize: '14px' },
+  loadingSub: { fontSize: '12px', color: '#b0b8c8', marginTop: '6px' },
   slowWarning: { fontSize: '12px', color: '#e67e22', marginTop: '8px', padding: '8px 12px', background: '#fef9e7', borderRadius: '8px' },
   error: { padding: '12px 16px', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '10px', color: '#d63031', fontSize: '13px', marginBottom: '12px' },
   result: { marginTop: '16px', padding: '16px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4' },
@@ -292,4 +329,6 @@ const styles: Record<string, React.CSSProperties> = {
   badge: { fontSize: '13px', fontWeight: 500, padding: '3px 10px', borderRadius: '6px', background: '#eef1ff', color: '#4f6ef7', display: 'inline-block' },
   tags: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' },
   tag: { fontSize: '12px', fontWeight: 500, padding: '3px 8px', borderRadius: '6px', background: '#eef1ff', color: '#4f6ef7' },
+  nextActions: { display: 'flex', gap: '8px', marginTop: '10px' },
+  nextActionBtn: { flex: 1, display: 'block', padding: '10px 0', fontSize: '12px', fontWeight: 600, color: 'white', background: '#4f6ef7', textDecoration: 'none', borderRadius: '8px', textAlign: 'center' },
 };

@@ -2,6 +2,8 @@ import { getSupabase } from '../../../lib/supabase';
 import { getUserId } from '../../../lib/auth-utils';
 import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
+import { getDb, queryOne, execute, generateId } from '../../../lib/db';
+import { calculateNewMastery } from '../../../lib/mastery';
 import type { GradingResult } from '../../../lib/grading';
 
 export async function GET(request: NextRequest) {
@@ -24,13 +26,18 @@ export async function GET(request: NextRequest) {
   const order = searchParams.get('order') || 'desc';
   const filterKp = searchParams.get('filter_kp');
   const filterError = searchParams.get('filter_error');
+  const filterErrorType = searchParams.get('filter_error_type');
 
   let query = supabase.from('questions').select('*').eq('user_id', userId);
   if (filterKp) {
     query = query.eq('knowledge_point', filterKp);
   }
   if (filterError) {
-    query = query.eq('error_type', filterError);
+    if (filterError === 'correct') query = query.eq('is_correct', 1);
+    else if (filterError === 'wrong') query = query.eq('is_correct', 0);
+  }
+  if (filterErrorType && filterErrorType !== 'all') {
+    query = query.eq('error_type', filterErrorType);
   }
 
   query = query.order(sortBy, { ascending: order === 'asc' });
@@ -86,5 +93,31 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: '保存失败' }, { status: 500 });
   }
+
+  if (grading?.knowledge_point) {
+    try {
+      await getDb();
+      const existing = queryOne(
+        'SELECT id, mastery_level, total_count, correct_count FROM knowledge_points WHERE name = ? AND user_id = ?',
+        [grading.knowledge_point, userId]
+      );
+      const prevMastery = existing?.mastery_level ?? 50;
+      const prevTotal = existing?.total_count ?? 0;
+      const prevCorrect = existing?.correct_count ?? 0;
+      const newMastery = calculateNewMastery(prevMastery, grading.is_correct, prevTotal);
+      if (existing) {
+        execute(
+          'UPDATE knowledge_points SET mastery_level = ?, total_count = ?, correct_count = ?, last_practiced_at = datetime(\'now\') WHERE id = ?',
+          [newMastery, prevTotal + 1, prevCorrect + (grading.is_correct ? 1 : 0), existing.id]
+        );
+      } else {
+        execute(
+          'INSERT INTO knowledge_points (id, name, subject, mastery_level, total_count, correct_count, last_practiced_at, user_id) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'), ?)',
+          [generateId(), grading.knowledge_point, body.subject || '数学', newMastery, prevTotal + 1, prevCorrect + (grading.is_correct ? 1 : 0), userId]
+        );
+      }
+    } catch {}
+  }
+
   return NextResponse.json({ data: data?.[0] });
 }

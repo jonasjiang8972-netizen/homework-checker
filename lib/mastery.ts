@@ -10,7 +10,7 @@
 
 export interface MasteryInput {
   isCorrect: boolean;
-  totalCount: number;   // 该知识点历史累计做题数
+  totalCount: number;
 }
 
 export interface KnowledgePointStat {
@@ -21,14 +21,12 @@ export interface KnowledgePointStat {
   weak: boolean;
 }
 
-/** 单次做题后的掌握度变动值，随做题量衰减 */
 function delta(totalCount: number): number {
   const base = 10;
-  const decay = Math.min(totalCount, 20) / 20; // 前 20 题线性衰减，之后不再衰减
-  return Math.round(base * (1 - decay * 0.5));  // 初始 10，稳定后 5
+  const decay = Math.min(totalCount, 20) / 20;
+  return Math.round(base * (1 - decay * 0.5));
 }
 
-/** 给定当前掌握度和本次正误，计算新掌握度 */
 export function calculateNewMastery(
   currentMastery: number,
   isCorrect: boolean,
@@ -39,7 +37,6 @@ export function calculateNewMastery(
   return Math.max(0, Math.min(100, currentMastery + change));
 }
 
-/** 根据用户对该知识点的累计数据批量计算掌握度 */
 export function computeMastery(inputs: MasteryInput[]): number {
   if (inputs.length === 0) return 50;
   let mastery = 50;
@@ -51,7 +48,6 @@ export function computeMastery(inputs: MasteryInput[]): number {
   return mastery;
 }
 
-/** 从 questions 数据聚合出每个知识点的掌握度统计 */
 export function aggregateStats(
   rows: Array<{ knowledge_point: string | null; is_correct: boolean | null }>,
 ): KnowledgePointStat[] {
@@ -78,6 +74,20 @@ export function aggregateStats(
     });
   }
 
-  stats.sort((a, b) => a.masteryLevel - b.masteryLevel); // 薄弱优先
+  stats.sort((a, b) => a.masteryLevel - b.masteryLevel);
   return stats;
+}
+
+export function updateMasteryDelta(
+  prevMastery: number,
+  prevTotal: number,
+  prevCorrect: number,
+  isCorrect: boolean,
+): { mastery: number; total: number; correct: number } {
+  const newMastery = calculateNewMastery(prevMastery, isCorrect, prevTotal);
+  return {
+    mastery: newMastery,
+    total: prevTotal + 1,
+    correct: prevCorrect + (isCorrect ? 1 : 0),
+  };
 }

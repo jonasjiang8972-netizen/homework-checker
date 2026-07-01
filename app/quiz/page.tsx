@@ -83,7 +83,30 @@ export default function Quiz() {
       setSelectedKp(kp);
       handleGenerate(kp);
     }
+    const savedDraft = localStorage.getItem('quiz-draft-answers');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.recordId && parsed.answers) {
+          setRecord(parsed.recordId ? { id: parsed.recordId, knowledge_point: parsed.kp || '', questions_json: [], answers_json: null, score: null, total: null, passed: null, created_at: '' } : null);
+        }
+      } catch {}
+    }
   }, []);
+
+  useEffect(() => {
+    if (record?.id && answers.length > 0) {
+      localStorage.setItem('quiz-draft-answers', JSON.stringify({
+        recordId: record.id,
+        kp: record.knowledge_point,
+        answers,
+      }));
+    }
+  }, [answers, record?.id]);
+
+  const clearDraft = () => {
+    localStorage.removeItem('quiz-draft-answers');
+  };
 
   const fetchSettings = async () => {
     try {
@@ -122,6 +145,7 @@ export default function Quiz() {
     setAnswers([]);
     setRecord(null);
     setQuestions([]);
+    clearDraft();
     try {
       const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
       const res = await fetch('/api/quiz', {
@@ -163,6 +187,7 @@ export default function Quiz() {
         setGrade(json.grade);
         setCorrectedResults(json.grade.results);
         setPassed(json.passed);
+        clearDraft();
         fetchHistory();
         fetchWeakPoints();
       }
@@ -209,6 +234,7 @@ export default function Quiz() {
     setCorrectedResults(null);
     setPassed(null);
     setError('');
+    clearDraft();
   };
 
   const displayResults = correctedResults || grade?.results || [];

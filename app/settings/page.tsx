@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { IconSettings, IconLogout, IconMail, IconCheck } from '../../lib/icons';
 import { ModelSelector } from '../components/ModelSelector';
@@ -21,6 +21,14 @@ export default function Settings() {
   const [loginCode, setLoginCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
 
@@ -59,6 +67,7 @@ export default function Settings() {
       setLoginError('请输入正确的邮箱地址');
       return;
     }
+    if (countdown > 0) return;
     setSendingCode(true);
     setLoginError('');
     try {
@@ -73,6 +82,17 @@ export default function Settings() {
       } else {
         setCodeSent(true);
         setLoginError('');
+        setCountdown(60);
+        countdownRef.current = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              if (countdownRef.current) clearInterval(countdownRef.current);
+              countdownRef.current = null;
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       }
     } catch {
       setLoginError('发送失败，请稍后重试');
@@ -183,10 +203,10 @@ export default function Settings() {
             {!codeSent ? (
               <button
                 onClick={handleSendCode}
-                disabled={sendingCode || !loginEmail.trim()}
-                style={{ ...styles.primaryBtn, width: '100%', ...((sendingCode || !loginEmail.trim()) ? styles.btnDisabled : {}) }}
+                disabled={sendingCode || !loginEmail.trim() || countdown > 0}
+                style={{ ...styles.primaryBtn, width: '100%', ...((sendingCode || !loginEmail.trim() || countdown > 0) ? styles.btnDisabled : {}) }}
               >
-                {sendingCode ? '发送中...' : '发送验证码'}
+                {sendingCode ? '发送中...' : countdown > 0 ? `${countdown}s 后可重发` : '发送验证码'}
               </button>
             ) : (
               <>
@@ -245,6 +265,25 @@ export default function Settings() {
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>API 密钥（给爸爸妈妈填）</h2>
           <p style={styles.sectionDesc}>这里需要请爸爸妈妈帮忙填写，会加密存储，放心使用。</p>
+
+          <div style={styles.keyGuideBox}>
+            <div style={styles.keyGuideTitle}>📋 怎么获取 API Key？</div>
+            <div style={styles.keyGuideSteps}>
+              <div style={styles.keyGuideStep}>
+                <span style={styles.keyGuideNum}>1</span>
+                <span>让爸爸妈妈打开 <a href="https://console.anthropic.com" target="_blank" style={styles.keyGuideLink}>console.anthropic.com</a></span>
+              </div>
+              <div style={styles.keyGuideStep}>
+                <span style={styles.keyGuideNum}>2</span>
+                <span>登录后在 <strong>API Keys</strong> 页面点击 <strong>Create Key</strong></span>
+              </div>
+              <div style={styles.keyGuideStep}>
+                <span style={styles.keyGuideNum}>3</span>
+                <span>复制以 <code style={styles.keyGuideCode}>sk-ant-</code> 开头的密钥，粘贴到下面</span>
+              </div>
+            </div>
+            <div style={styles.keyGuideTip}>💡 也可以用 <a href="https://siliconflow.cn" target="_blank" style={styles.keyGuideLink}>SiliconFlow</a> 的兼容接口（免费额度更多）</div>
+          </div>
 
           {keyStatus === 'has' && (
             <div style={styles.keyInfo}>
@@ -369,4 +408,12 @@ const styles: Record<string, React.CSSProperties> = {
   select: { padding: '8px 12px', fontSize: '12px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', color: '#333', background: 'white' },
   modeToggle: { padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#4f6ef7', background: '#eef1ff', border: '1px solid #d0d8ff', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' },
   modeToggleParent: { color: '#e67e22', background: '#fef9e7', borderColor: '#fce4b3' },
+  keyGuideBox: { padding: '12px 14px', background: '#f8f9fc', borderRadius: '8px', marginBottom: '12px', border: '1px solid #eef0f4' },
+  keyGuideTitle: { fontSize: '13px', fontWeight: 600, color: '#1a1a2e', marginBottom: '8px' },
+  keyGuideSteps: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  keyGuideStep: { display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: '#555', lineHeight: '1.5' },
+  keyGuideNum: { width: '18px', height: '18px', borderRadius: '50%', background: '#4f6ef7', color: 'white', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' },
+  keyGuideLink: { color: '#4f6ef7', textDecoration: 'none' },
+  keyGuideCode: { background: '#eef1ff', color: '#4f6ef7', padding: '1px 5px', borderRadius: '3px', fontSize: '11px' },
+  keyGuideTip: { marginTop: '8px', fontSize: '11px', color: '#8e95a2', lineHeight: '1.5' },
 };

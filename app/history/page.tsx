@@ -43,13 +43,14 @@ export default function History() {
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
   const [filterError, setFilterError] = useState('all');
+  const [filterErrorType, setFilterErrorType] = useState('all');
   const [mode, setMode] = useState<'student' | 'parent'>('student');
   const [modeLoaded, setModeLoaded] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
     fetchMode();
-  }, [sortBy, sortOrder, filterSubject, filterError]);
+  }, [sortBy, sortOrder, filterSubject, filterError, filterErrorType]);
 
   const fetchMode = async () => {
     try {
@@ -66,6 +67,7 @@ export default function History() {
     params.set('order', sortOrder);
     if (filterSubject !== '全部') params.set('filter_subject', filterSubject);
     if (filterError !== 'all') params.set('filter_error', filterError);
+    if (filterErrorType !== 'all') params.set('filter_error_type', filterErrorType);
     return params.toString();
   };
 
@@ -177,7 +179,22 @@ export default function History() {
         </div>
       )}
 
-      {loading ? (
+      {!loading && !fetchError && questions.length > 0 && (
+        <div style={styles.errorTypeBar}>
+          {['全部类型', '计算失误', '概念不清', '审题错误', '方法错误'].map(t => (
+            <button
+              key={t}
+              onClick={() => setFilterErrorType(t === '全部类型' ? 'all' : t)}
+              style={{
+                ...styles.errorTypeBtn,
+                ...((filterErrorType === 'all' && t === '全部类型') || filterErrorType === t ? styles.errorTypeBtnActive : {}),
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
         <div style={styles.skeletonList}>
           {[0, 1, 2].map((i) => <div key={i} style={styles.skeletonItem} />)}
         </div>
@@ -391,4 +408,7 @@ const styles: Record<string, React.CSSProperties> = {
   weakTags: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' },
   weakTag: { fontSize: '12px', fontWeight: 500, padding: '4px 10px', borderRadius: '8px', background: '#fff5f5', color: '#d63031', border: '1px solid #ffd5d5' },
   studentNone: { fontSize: '13px', color: '#8e95a2', marginBottom: '16px' },
+  errorTypeBar: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' },
+  errorTypeBtn: { padding: '4px 10px', fontSize: '11px', fontWeight: 500, color: '#666', background: '#f0f2f5', border: 'none', borderRadius: '6px', cursor: 'pointer' },
+  errorTypeBtnActive: { color: 'white', background: '#4f6ef7' },
 };

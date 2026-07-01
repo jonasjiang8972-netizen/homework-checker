@@ -1,13 +1,14 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { IconHome, IconHistory, IconChart, IconBook, IconSettings } from '../../lib/icons';
+import { IconHome, IconHistory, IconChart, IconBook, IconQuiz, IconSettings } from '../../lib/icons';
 
 const NAV_ITEMS = [
   { href: '/', label: '做作业', Icon: IconHome },
   { href: '/history', label: '成长日记', Icon: IconHistory },
+  { href: '/quiz', label: '闯关', Icon: IconQuiz },
   { href: '/dashboard', label: '学习地图', Icon: IconChart },
-  { href: '/plans', label: '路线', Icon: IconBook },
+  { href: '/plans', label: '计划', Icon: IconBook },
   { href: '/settings', label: '设置', Icon: IconSettings },
 ];
 
@@ -22,8 +23,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   item: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    gap: '2px', padding: '4px 16px', cursor: 'pointer',
-    textDecoration: 'none', color: '#8e95a2', fontSize: '11px', fontWeight: 500,
+    gap: '2px', padding: '4px 8px', cursor: 'pointer',
+    textDecoration: 'none', color: '#8e95a2', fontSize: '10px', fontWeight: 500,
     transition: 'color 0.15s',
     border: 'none', background: 'none', position: 'relative',
   },

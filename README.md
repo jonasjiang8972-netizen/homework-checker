@@ -4,7 +4,7 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.9.1-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
 [![Tests](https://img.shields.io/badge/tests-67_✓-brightgreen)]()
@@ -34,6 +34,10 @@
 | 👤 **隐私模式** | 学生模式仅展示趋势汇总，家长模式可查看单题详情 | ✅ 已实现（v2.8） |
 | 🐳 **Docker 部署** | 一键 Docker Compose 启动，内置 SQLite 数据库 | ✅ 已实现 |
 | 🛡️ **安全加固** | 上传鉴权、加密密钥管理、API 限流、JWT 过期 | ✅ 已实现（v2.7） |
+| 💾 **掌握度实时更新** | 批改后自动更新知识点掌握度，即时反映在热力图上 | ✅ 已实现（v2.10） |
+| 📝 **测验草稿保存** | 测验答案自动保存到本地，防止意外丢失 | ✅ 已实现（v2.10） |
+| 🎯 **闯关入口直达** | 底部导航栏新增闯关挑战入口 | ✅ 已实现（v2.10） |
+| 🔍 **错题分类筛选** | 支持按错误类型（计算失误/概念不清等）筛选 | ✅ 已实现（v2.10） |
 
 ---
 
@@ -274,17 +278,17 @@ curl http://localhost:3000
 ### 掌握度计算（[lib/mastery.ts](lib/mastery.ts)）
 
 ```typescript
-// 掌握度基于贝叶斯更新原理
-// 初始值：50 分，正确：+α，错误：-β
-// α/β 随做题数量对数衰减
+// 掌握度基于线性衰减原理
+// 初始值：50 分，正确：+Δ，错误：-Δ
+// Δ 随做题量线性衰减（前20题从10衰减至5）
 function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount: number) {
-  const decayFactor = 1 / Math.log(totalCount + 2);
-  const baseDelta = 20;
-  const delta = baseDelta * decayFactor;
+  const baseDelta = 10;
+  const decay = Math.min(totalCount, 20) / 20;
+  const delta = Math.round(baseDelta * (1 - decay * 0.5)); // 初始10，稳定后5
   const newMastery = isCorrect
     ? Math.min(100, prevMastery + delta)
     : Math.max(0, prevMastery - delta);
-  return Math.round(newMastery);
+  return newMastery;
 }
 ```
 
@@ -294,6 +298,7 @@ function calculateNewMastery(prevMastery: number, isCorrect: boolean, totalCount
 
 | 版本 | 日期 | 主要变更 |
 |------|------|----------|
+| v2.10.0 | 2026-07-01 | 💾 批改后实时更新掌握度 + 📝 测验草稿自动保存 + 🎯 闯关导航直达 + 🔍 错题分类筛选 + 🔑 API Key获取引导 |
 | v2.9.1 | 2026-06-30 | 🛡️ 全 API Rate Limiting + HTTP 安全头 + X-Powered-By 移除 |
 | v2.9.0 | 2026-06-30 | 🧪 测验系统重构：学科适配、AI 批改增强、手动纠错、JSON 序列化修复、模型选择器改进 |
 | v2.8.5 | 2026-06-30 | 🚀 修复模型列表获取 + 支持自定义 API 接口地址，批改跟随用户配置 |
