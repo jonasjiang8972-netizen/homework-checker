@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { checkRateLimit, getClientIp } from '../../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 
 const MIME_MAP: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -24,11 +24,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { file } = await params;
+
+  if (!/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif|webp|bmp)$/.test(file)) {
+    return NextResponse.json({ error: '文件不存在' }, { status: 404 });
+  }
+
   const ext = file.split('.').pop()?.toLowerCase() || '';
   const mime = MIME_MAP[ext] || 'application/octet-stream';
+  const uploadDir = join(process.cwd(), 'data', 'uploads');
+  const filePath = join(uploadDir, file);
+
+  if (!filePath.startsWith(uploadDir + sep)) {
+    return NextResponse.json({ error: '文件不存在' }, { status: 404 });
+  }
 
   try {
-    const filePath = join(process.cwd(), 'data', 'uploads', file);
     const buffer = await readFile(filePath);
     return new NextResponse(buffer, {
       headers: {

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   const filterError = searchParams.get('filter_error');
   const filterErrorType = searchParams.get('filter_error_type');
 
-  let query = supabase.from('questions').select('*').eq('user_id', userId);
+  let query = supabase.from('questions').select('id, question, error_analysis, subject, image_url, is_correct, knowledge_point, error_type, created_at, user_id').eq('user_id', userId);
   if (filterKp) {
     query = query.eq('knowledge_point', filterKp);
   }
