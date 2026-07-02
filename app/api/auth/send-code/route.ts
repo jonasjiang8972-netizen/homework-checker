@@ -42,8 +42,14 @@ export async function POST(request: NextRequest) {
   try {
     await sendVerificationCode(email, code);
     return NextResponse.json({ ok: true, message: '验证码已发送到你的邮箱' });
-  } catch {
-    return NextResponse.json({ error: '验证码发送失败，请检查邮箱地址或稍后重试' }, { status: 500 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('timeout') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED')) {
+      codeStore.delete(email);
+      return NextResponse.json({ error: '邮件服务器连接超时，请稍后重试或联系管理员' }, { status: 504 });
+    }
+    codeStore.delete(email);
+    return NextResponse.json({ error: '验证码发送失败，请稍后重试' }, { status: 500 });
   }
 }
 

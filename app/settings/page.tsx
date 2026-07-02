@@ -70,12 +70,16 @@ export default function Settings() {
     if (countdown > 0) return;
     setSendingCode(true);
     setLoginError('');
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 20000);
     try {
       const res = await fetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail.trim() }),
+        signal: abortController.signal,
       });
+      clearTimeout(timeoutId);
       const json = await res.json();
       if (json.error) {
         setLoginError(json.error);
@@ -94,8 +98,12 @@ export default function Settings() {
           });
         }, 1000);
       }
-    } catch {
-      setLoginError('发送失败，请稍后重试');
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        setLoginError('请求超时，请稍后重试');
+      } else {
+        setLoginError('网络错误，请稍后重试');
+      }
     }
     setSendingCode(false);
   };
