@@ -54,6 +54,12 @@ export default function History() {
     fetchMode();
   }, [sortBy, sortOrder, filterSubject, filterError, filterErrorType]);
 
+  const subjects = useMemo(() => {
+    const set = new Set<string>();
+    questions.forEach(q => { if (q.subject) set.add(q.subject); });
+    return ['全部', ...Array.from(set)];
+  }, [questions]);
+
   if (status === 'loading') {
     return (
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 16px', textAlign: 'center', color: '#8e95a2' }}>
@@ -119,12 +125,6 @@ export default function History() {
     if (isNaN(d.getTime())) return '';
     return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
-
-  const subjects = useMemo(() => {
-    const set = new Set<string>();
-    questions.forEach(q => { if (q.subject) set.add(q.subject); });
-    return ['全部', ...Array.from(set)];
-  }, [questions]);
 
   const totalCount = questions.length;
   const correctCount = questions.filter(q => q.is_correct === true).length;
