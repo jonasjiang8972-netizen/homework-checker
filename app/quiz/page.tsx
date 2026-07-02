@@ -58,6 +58,19 @@ export default function Quiz() {
   const [selectedKp, setSelectedKp] = useState('');
   const [customKp, setCustomKp] = useState('');
   const [subject, setSubject] = useState('数学');
+  const [record, setRecord] = useState<QuizRecord | null>(null);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [grade, setGrade] = useState<QuizGrade | null>(null);
+  const [correctedResults, setCorrectedResults] = useState<QuizResult[] | null>(null);
+  const [passed, setPassed] = useState<boolean | null>(null);
+  const [loadingKp, setLoadingKp] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
+  const [error, setError] = useState('');
+  const [history, setHistory] = useState<QuizRecord[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   if (status === 'loading') {
     return (
@@ -81,22 +94,6 @@ export default function Quiz() {
       </div>
     );
   }
-
-  const [record, setRecord] = useState<QuizRecord | null>(null);
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [grade, setGrade] = useState<QuizGrade | null>(null);
-  const [correctedResults, setCorrectedResults] = useState<QuizResult[] | null>(null);
-  const [passed, setPassed] = useState<boolean | null>(null);
-
-  const [loadingKp, setLoadingKp] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [correcting, setCorrecting] = useState(false);
-  const [error, setError] = useState('');
-
-  const [history, setHistory] = useState<QuizRecord[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
     fetchWeakPoints();

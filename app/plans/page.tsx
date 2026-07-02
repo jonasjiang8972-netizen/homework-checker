@@ -30,6 +30,10 @@ export default function Plans() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    fetchPlans();
+  }, []);
+
   if (status === 'loading') {
     return (
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 16px', textAlign: 'center', color: '#8e95a2' }}>
@@ -52,10 +56,6 @@ export default function Plans() {
       </div>
     );
   }
-
-  useEffect(() => {
-    fetchPlans();
-  }, []);
 
   const fetchPlans = async () => {
     setLoading(true);

@@ -49,6 +49,11 @@ export default function History() {
   const [mode, setMode] = useState<'student' | 'parent'>('student');
   const [modeLoaded, setModeLoaded] = useState(false);
 
+  useEffect(() => {
+    fetchQuestions();
+    fetchMode();
+  }, [sortBy, sortOrder, filterSubject, filterError, filterErrorType]);
+
   if (status === 'loading') {
     return (
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 16px', textAlign: 'center', color: '#8e95a2' }}>
@@ -71,11 +76,6 @@ export default function History() {
       </div>
     );
   }
-
-  useEffect(() => {
-    fetchQuestions();
-    fetchMode();
-  }, [sortBy, sortOrder, filterSubject, filterError, filterErrorType]);
 
   const fetchMode = async () => {
     try {

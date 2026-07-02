@@ -27,7 +27,8 @@ interface Question {
 }
 
 export default function RedoPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? '';
   const { data: session, status } = useSession();
   const [q, setQ] = useState<Question | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,10 @@ export default function RedoPage() {
   const [answer, setAnswer] = useState('');
   const [revealed, setRevealed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchQuestion();
+  }, [id]);
 
   if (status === 'loading') {
     return (
@@ -58,10 +63,6 @@ export default function RedoPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    fetchQuestion();
-  }, [id]);
 
   const fetchQuestion = async () => {
     setLoading(true);

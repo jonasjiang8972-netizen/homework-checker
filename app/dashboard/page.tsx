@@ -20,6 +20,11 @@ export default function Dashboard() {
   const [subject, setSubject] = useState('全部');
   const [subjects, setSubjects] = useState<string[]>(['全部']);
 
+  useEffect(() => {
+    fetchStats();
+    fetchSubjects();
+  }, []);
+
   if (status === 'loading') {
     return (
       <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 16px', textAlign: 'center', color: '#8e95a2' }}>
@@ -42,11 +47,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  useEffect(() => {
-    fetchStats();
-    fetchSubjects();
-  }, []);
 
   const fetchStats = async (sub?: string) => {
     setLoading(true);
