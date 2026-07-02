@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { IconBook, IconTarget, IconCheck, IconPlus, IconFileText } from '../../lib/icons';
 
 interface StudyPlan {
@@ -23,10 +24,34 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> =
 };
 
 export default function Plans() {
+  const { data: session, status } = useSession();
   const [plans, setPlans] = useState<StudyPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+
+  if (status === 'loading') {
+    return (
+      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 16px', textAlign: 'center', color: '#8e95a2' }}>
+        加载中...
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div style={{ maxWidth: '400px', margin: '40px auto', textAlign: 'center', padding: '32px 20px', background: 'white', borderRadius: '16px', border: '1px solid #eef0f4' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 8px 0' }}>请先登录</h2>
+        <p style={{ fontSize: '14px', color: '#8e95a2', margin: '0 0 20px 0' }}>
+          查看学习路线需要先验证身份
+        </p>
+        <a href="/settings" style={{ display: 'inline-block', padding: '12px 32px', fontSize: '15px', fontWeight: 600, color: 'white', background: '#4f6ef7', borderRadius: '12px', textDecoration: 'none' }}>
+          前往登录
+        </a>
+      </div>
+    );
+  }
 
   useEffect(() => {
     fetchPlans();

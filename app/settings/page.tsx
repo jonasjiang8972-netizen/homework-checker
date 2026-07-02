@@ -119,8 +119,12 @@ export default function Settings() {
     });
     if (result?.error) {
       setLoginError('验证码错误或已过期，请重新获取');
+      setLoggingIn(false);
+    } else if (result?.ok) {
+      window.location.href = '/';
+    } else {
+      setLoggingIn(false);
     }
-    setLoggingIn(false);
   };
 
   const handleSaveKey = async () => {

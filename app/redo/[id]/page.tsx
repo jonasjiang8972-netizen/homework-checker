@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 interface GradingResult {
   is_correct: boolean;
@@ -27,12 +28,36 @@ interface Question {
 
 export default function RedoPage() {
   const { id } = useParams<{ id: string }>();
+  const { data: session, status } = useSession();
   const [q, setQ] = useState<Question | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [answer, setAnswer] = useState('');
   const [revealed, setRevealed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  if (status === 'loading') {
+    return (
+      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 16px', textAlign: 'center', color: '#8e95a2' }}>
+        加载中...
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div style={{ maxWidth: '400px', margin: '40px auto', textAlign: 'center', padding: '32px 20px', background: 'white', borderRadius: '16px', border: '1px solid #eef0f4' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 8px 0' }}>请先登录</h2>
+        <p style={{ fontSize: '14px', color: '#8e95a2', margin: '0 0 20px 0' }}>
+          重新挑战需要先验证身份
+        </p>
+        <a href="/settings" style={{ display: 'inline-block', padding: '12px 32px', fontSize: '15px', fontWeight: 600, color: 'white', background: '#4f6ef7', borderRadius: '12px', textDecoration: 'none' }}>
+          前往登录
+        </a>
+      </div>
+    );
+  }
 
   useEffect(() => {
     fetchQuestion();
