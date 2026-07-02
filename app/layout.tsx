@@ -1,4 +1,5 @@
 import { SessionProvider } from './components/SessionProvider';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { BottomNav } from './components/BottomNav';
 
 export const metadata = {
@@ -25,9 +26,11 @@ export default function RootLayout({
       </head>
       <body style={{ margin: 0, padding: 0, background: '#f8f9fc', minHeight: '100vh' }}>
         <SessionProvider>
-          <div style={{ paddingBottom: '80px', paddingTop: '0', minHeight: '100vh' }}>
-            {children}
-          </div>
+          <ErrorBoundary>
+            <div style={{ paddingBottom: '80px', paddingTop: '0', minHeight: '100vh' }}>
+              {children}
+            </div>
+          </ErrorBoundary>
           <BottomNav />
         </SessionProvider>
       </body>
