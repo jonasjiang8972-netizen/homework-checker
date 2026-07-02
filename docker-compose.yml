@@ -12,6 +12,7 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
     volumes:
       - ./data:/app/data
+    command: ["node", "--dns-result-order=ipv4first", "server.js"]
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000']
