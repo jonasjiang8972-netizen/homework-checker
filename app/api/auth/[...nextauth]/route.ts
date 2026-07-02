@@ -27,6 +27,17 @@ const handler = NextAuth({
   ],
   session: { strategy: 'jwt', maxAge: 24 * 60 * 60 },
   pages: { signIn: '/settings' },
+  cookies: {
+    sessionToken: {
+      name: 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: false,
+      },
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user?.email) token.email = user.email;

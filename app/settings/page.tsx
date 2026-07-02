@@ -123,6 +123,7 @@ export default function Settings() {
     } else if (result?.ok) {
       window.location.href = '/';
     } else {
+      setLoginError('登录失败，请重试');
       setLoggingIn(false);
     }
   };
