@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { IconHome, IconHistory, IconChart, IconBook, IconQuiz, IconSettings } from '../../lib/icons';
 
 const NAV_ITEMS = [
@@ -44,13 +45,13 @@ export function BottomNav() {
       {NAV_ITEMS.map(({ href, label, Icon }) => {
         const active = pathname === href;
         return (
-          <a key={href} href={href} style={{ ...styles.item, ...(active ? styles.itemActive : {}) }}>
+          <Link key={href} href={href} prefetch={false} style={{ ...styles.item, ...(active ? styles.itemActive : {}) }}>
             {active && <div style={styles.activeDot} />}
             <div style={styles.iconWrap}>
               <Icon />
             </div>
             <span>{label}</span>
-          </a>
+          </Link>
         );
       })}
     </nav>
