@@ -32,5 +32,5 @@ export async function getApiBaseUrl(): Promise<string | null> {
 
 export async function getUserId(): Promise<string | null> {
   const session = await getServerSession();
-  return session?.user?.email || null;
+  return (session?.user as any)?.id || session?.user?.email || null;
 }

@@ -108,6 +108,23 @@ function initSchema(db: SqlJsDatabase) {
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      name TEXT,
+      email_verified INTEGER DEFAULT 0,
+      email_verify_token TEXT,
+      email_verify_sent_at TEXT,
+      email_due_at TEXT,
+      last_login_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_users_verify_token ON users(email_verify_token);
+
     CREATE INDEX IF NOT EXISTS idx_kp_user ON knowledge_points(user_id);
     CREATE INDEX IF NOT EXISTS idx_kp_name_user ON knowledge_points(name, user_id);
     CREATE INDEX IF NOT EXISTS idx_plans_user ON study_plans(user_id);
@@ -118,6 +135,11 @@ function initSchema(db: SqlJsDatabase) {
 
   try { db.run("ALTER TABLE user_settings ADD COLUMN base_url TEXT DEFAULT 'https://api.siliconflow.cn/v1'"); } catch {}
   try { db.run("ALTER TABLE test_records ADD COLUMN subject TEXT DEFAULT '数学'"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN email_verify_token TEXT"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN email_verify_sent_at TEXT"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN email_due_at TEXT"); } catch {}
+  try { db.run("ALTER TABLE users ADD COLUMN last_login_at TEXT"); } catch {}
 }
 
 export function queryAll(sql: string, params: any[] = []): Record<string, any>[] {

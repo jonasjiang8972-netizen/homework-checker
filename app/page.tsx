@@ -19,6 +19,7 @@ export default function Home() {
   const [error, setError] = useState<string>('');
   const [slowWarning, setSlowWarning] = useState(false);
   const [savedQuestionId, setSavedQuestionId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [subject, setSubject] = useState('数学');

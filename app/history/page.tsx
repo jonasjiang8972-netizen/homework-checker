@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { MarkdownRenderer } from '../../lib/markdown-renderer';
 import { IconCheck, IconX, IconFileText, IconHistory } from '../../lib/icons';
@@ -49,16 +49,59 @@ export default function History() {
   const [mode, setMode] = useState<'student' | 'parent'>('student');
   const [modeLoaded, setModeLoaded] = useState(false);
 
+  const buildQuery = useCallback(() => {
+    const params = new URLSearchParams();
+    params.set('sort_by', sortBy);
+    params.set('order', sortOrder);
+    if (filterSubject !== '全部') params.set('filter_subject', filterSubject);
+    if (filterError !== 'all') params.set('filter_error', filterError);
+    if (filterErrorType !== 'all') params.set('filter_error_type', filterErrorType);
+    return params.toString();
+  }, [sortBy, sortOrder, filterSubject, filterError, filterErrorType]);
+
+  const fetchMode = useCallback(async () => {
+    try {
+      const res = await fetch('/api/user/settings');
+      const json = await res.json();
+      if (json.mode) setMode(json.mode);
+    } catch {}
+    setModeLoaded(true);
+  }, []);
+
+  const fetchQuestions = useCallback(async () => {
+    setLoading(true);
+    setFetchError('');
+    try {
+      const res = await fetch(`/api/questions?${buildQuery()}`);
+      const json = await res.json();
+      if (json.error) {
+        setFetchError(json.error);
+        setQuestions([]);
+      } else {
+        setQuestions(json.data || []);
+      }
+    } catch {
+       setFetchError('加载失败了，检查一下网络吧');
+    }
+    setLoading(false);
+  }, [buildQuery]);
+
   useEffect(() => {
     fetchQuestions();
     fetchMode();
-  }, [sortBy, sortOrder, filterSubject, filterError, filterErrorType]);
+  }, [fetchQuestions, fetchMode]);
 
   const subjects = useMemo(() => {
     const set = new Set<string>();
     questions.forEach(q => { if (q.subject) set.add(q.subject); });
     return ['全部', ...Array.from(set)];
   }, [questions]);
+
+  const formatDate = useCallback((dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }, []);
 
   if (status === 'loading') {
     return (
@@ -82,49 +125,6 @@ export default function History() {
       </div>
     );
   }
-
-  const fetchMode = async () => {
-    try {
-      const res = await fetch('/api/user/settings');
-      const json = await res.json();
-      if (json.mode) setMode(json.mode);
-    } catch {}
-    setModeLoaded(true);
-  };
-
-  const buildQuery = () => {
-    const params = new URLSearchParams();
-    params.set('sort_by', sortBy);
-    params.set('order', sortOrder);
-    if (filterSubject !== '全部') params.set('filter_subject', filterSubject);
-    if (filterError !== 'all') params.set('filter_error', filterError);
-    if (filterErrorType !== 'all') params.set('filter_error_type', filterErrorType);
-    return params.toString();
-  };
-
-  const fetchQuestions = async () => {
-    setLoading(true);
-    setFetchError('');
-    try {
-      const res = await fetch(`/api/questions?${buildQuery()}`);
-      const json = await res.json();
-      if (json.error) {
-        setFetchError(json.error);
-        setQuestions([]);
-      } else {
-        setQuestions(json.data || []);
-      }
-    } catch {
-       setFetchError('加载失败了，检查一下网络吧');
-    }
-    setLoading(false);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  };
 
   const totalCount = questions.length;
   const correctCount = questions.filter(q => q.is_correct === true).length;

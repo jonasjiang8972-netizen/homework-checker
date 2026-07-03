@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 
-export async function sendVerificationCode(to: string, code: string): Promise<void> {
+export async function sendVerificationCode(to: string, token: string, baseUrl?: string): Promise<void> {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
     throw new Error('SMTP not configured');
@@ -14,18 +14,24 @@ export async function sendVerificationCode(to: string, code: string): Promise<vo
     connectionTimeout: 15000,
     socketTimeout: 15000,
     tls: { rejectUnauthorized: false },
-  });
+    family: 4,
+  } as any);
+
+  const verifyUrl = `${baseUrl || process.env.NEXTAUTH_URL || ''}/api/auth/verify-email?token=${token}`;
 
   await transporter.sendMail({
     from: `作业小帮手 <${SMTP_USER}>`,
     to,
-    subject: '作业小帮手 - 登录验证码',
-    text: `你的验证码是：${code}，5分钟内有效。如果不是你本人操作，请忽略本邮件。`,
+    subject: '作业小帮手 - 验证你的邮箱',
+    text: `请点击以下链接验证你的邮箱：${verifyUrl} 如果不是你本人操作，请忽略本邮件。`,
     html: `<div style="font-family:sans-serif;padding:20px;max-width:480px">
       <h2 style="color:#1a1a2e">作业小帮手</h2>
-      <p>你的登录验证码是：</p>
-      <div style="font-size:32px;font-weight:700;color:#4f6ef7;letter-spacing:8px;text-align:center;padding:16px;background:#f0f3ff;border-radius:8px;margin:12px 0">${code}</div>
-      <p style="color:#8e95a2;font-size:13px">5分钟内有效，请勿泄露给他人。</p>
+      <p>请点击下方按钮验证你的邮箱：</p>
+      <div style="text-align:center;margin:20px 0">
+        <a href="${verifyUrl}" style="display:inline-block;padding:14px 32px;background:#4f6ef7;color:white;text-decoration:none;border-radius:10px;font-size:16px;font-weight:600">验证邮箱</a>
+      </div>
+      <p style="color:#8e95a2;font-size:13px">如果按钮无法点击，请复制以下链接到浏览器：<br/>${verifyUrl}</p>
+      <p style="color:#8e95a2;font-size:13px">如果不是你本人操作，请忽略本邮件。</p>
     </div>`,
   });
 }

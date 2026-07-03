@@ -18,6 +18,7 @@
     "next": "^16.2.9",
     "next-auth": "^4.24.14",
     "nodemailer": "^9.0.1",
+    "pdfjs-dist": "^5.6.205",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "sql.js": "^1.14.1",

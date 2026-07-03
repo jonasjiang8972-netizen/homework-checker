@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { IconSettings, IconLogout, IconMail, IconCheck } from '../../lib/icons';
 import { ModelSelector } from '../components/ModelSelector';
@@ -18,19 +18,11 @@ export default function Settings() {
   const [modelRefreshKey, setModelRefreshKey] = useState(0);
 
   const [loginEmail, setLoginEmail] = useState('');
-  const [loginCode, setLoginCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
-  const [sendingCode, setSendingCode] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, []);
+  const [loginPassword, setLoginPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
+
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -62,70 +54,37 @@ export default function Settings() {
     } catch {}
   };
 
-  const handleSendCode = async () => {
-    if (!loginEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginEmail)) {
-      setLoginError('请输入正确的邮箱地址');
-      return;
-    }
-    if (countdown > 0) return;
-    setSendingCode(true);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoginError('');
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 20000);
-    try {
-      const res = await fetch('/api/auth/send-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail.trim() }),
-        signal: abortController.signal,
-      });
-      clearTimeout(timeoutId);
-      const json = await res.json();
-      if (json.error) {
-        setLoginError(json.error);
-      } else {
-        setCodeSent(true);
-        setLoginError('');
-        setCountdown(60);
-        countdownRef.current = setInterval(() => {
-          setCountdown((prev) => {
-            if (prev <= 1) {
-              if (countdownRef.current) clearInterval(countdownRef.current);
-              countdownRef.current = null;
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setLoginError('请求超时，请稍后重试');
-      } else {
-        setLoginError('网络错误，请稍后重试');
-      }
-    }
-    setSendingCode(false);
-  };
-
-  const handleLogin = async () => {
-    if (!loginCode.trim()) return;
     setLoggingIn(true);
-    setLoginError('');
-    const result = await signIn('email-code', {
+    const result = await signIn('credentials', {
       email: loginEmail.trim(),
-      code: loginCode.trim(),
+      password: loginPassword,
       redirect: false,
     });
     if (result?.error) {
-      setLoginError('验证码错误或已过期，请重新获取');
-      setLoggingIn(false);
-    } else if (result?.ok) {
-      window.location.href = '/';
+      setLoginError('邮箱或密码错误');
     } else {
-      setLoginError('登录失败，请重试');
-      setLoggingIn(false);
+      window.location.reload();
     }
+    setLoggingIn(false);
+  };
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: session?.user?.email }),
+      });
+      const json = await res.json();
+      setMessage(json.ok ? '验证邮件已发送' : json.error || '发送失败');
+    } catch {
+      setMessage('发送失败');
+    }
+    setResending(false);
   };
 
   const handleSaveKey = async () => {
@@ -148,41 +107,46 @@ export default function Settings() {
           setApiKey('');
           setMessage('API Key 已加密保存');
           setModelRefreshKey(k => k + 1);
-          setKeyStatus('none');
-          return;
         }
       } catch {
-        errorMsg = `HTTP ${res.status} ${res.statusText}`;
+        setMessage('保存失败');
       }
-      setMessage(errorMsg);
-    } catch (e) {
-      setMessage(`网络错误: ${e instanceof Error ? e.message : '请求失败'}`);
+      if (errorMsg) setMessage(errorMsg);
+    } catch {
+      setMessage('保存失败');
     }
-    setKeyStatus('none');
+    if (keyStatus === 'saving') setKeyStatus('none');
   };
 
-  const handleDeleteKey = async () => {
-    if (!confirm('确定删除 API Key？')) return;
+  const handleRemoveKey = async () => {
+    setKeyStatus('saving');
     try {
       await fetch('/api/user/key', { method: 'DELETE' });
       setKeyStatus('none');
       setMaskedKey('');
+      setApiKey('');
       setMessage('API Key 已删除');
       setModelRefreshKey(k => k + 1);
     } catch {
       setMessage('删除失败');
     }
+    setKeyStatus('none');
   };
 
   const handleSaveSettings = async () => {
+    setMessage('');
     try {
-      const res = await fetch('/api/user/settings', {
-        method: 'PATCH',
+      await fetch('/api/user/settings', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ defaultSubject, defaultModel, mode, apiBaseUrl: apiBaseUrl || null }),
+        body: JSON.stringify({
+          defaultSubject,
+          defaultModel,
+          mode,
+          apiBaseUrl: apiBaseUrl || undefined,
+        }),
       });
-      const json = await res.json();
-      setMessage(json.ok ? '已经保存好啦 ✅' : '保存失败');
+      setMessage('设置已保存');
     } catch {
       setMessage('保存失败');
     }
@@ -190,91 +154,67 @@ export default function Settings() {
 
   if (status === 'loading') {
     return (
-      <div style={styles.page}>
-        <div style={styles.loading}>加载中...</div>
+      <div style={styles.container}>
+        <div style={styles.loadingBox}>加载中...</div>
       </div>
     );
   }
 
   if (status === 'unauthenticated') {
     return (
-      <div style={styles.page}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>登录</h1>
-        </div>
-
+      <div style={styles.container}>
         <div style={styles.card}>
-          <div style={styles.loginForm}>
+          <h1 style={styles.title}>登录</h1>
+          <form onSubmit={handleLogin}>
             <input
               type="email"
-              placeholder="输入邮箱地址"
+              placeholder="邮箱"
               value={loginEmail}
-              onChange={e => { setLoginEmail(e.target.value); setCodeSent(false); setLoginError(''); }}
-              style={styles.loginInput}
-              disabled={codeSent}
+              onChange={e => setLoginEmail(e.target.value)}
+              style={styles.input}
+              required
             />
-            {!codeSent ? (
-              <button
-                onClick={handleSendCode}
-                disabled={sendingCode || !loginEmail.trim() || countdown > 0}
-                style={{ ...styles.primaryBtn, width: '100%', ...((sendingCode || !loginEmail.trim() || countdown > 0) ? styles.btnDisabled : {}) }}
-              >
-                {sendingCode ? '发送中...' : countdown > 0 ? `${countdown}s 后可重发` : '发送验证码'}
-              </button>
-            ) : (
-              <>
-                <div style={styles.codeSentInfo}><IconCheck /> 验证码已发送到 {loginEmail}</div>
-                <input
-                  type="text"
-                  placeholder="输入6位验证码"
-                  value={loginCode}
-                  onChange={e => setLoginCode(e.target.value)}
-                  style={styles.loginInput}
-                  maxLength={6}
-                />
-                <button
-                  onClick={handleLogin}
-                  disabled={loggingIn || loginCode.length !== 6}
-                  style={{ ...styles.primaryBtn, width: '100%', ...((loggingIn || loginCode.length !== 6) ? styles.btnDisabled : {}) }}
-                >
-                  {loggingIn ? '登录中...' : '登录'}
-                </button>
-                <button
-                  onClick={() => { setCodeSent(false); setLoginCode(''); }}
-                  style={styles.linkBtn}
-                >更换邮箱</button>
-              </>
-            )}
-
-            {loginError && <div style={styles.loginError}>{loginError}</div>}
-          </div>
+            <input
+              type="password"
+              placeholder="密码"
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              style={styles.input}
+              required
+            />
+            {loginError && <div style={styles.error}>{loginError}</div>}
+            <button type="submit" disabled={loggingIn} style={{ ...styles.btn, ...(loggingIn ? styles.btnDisabled : {}) }}>
+              {loggingIn ? '登录中...' : '登录'}
+            </button>
+          </form>
+          <p style={styles.footer}>
+            还没有账号？<a href="/register" style={styles.link}>立即注册</a>
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>设置</h1>
-        <button onClick={() => signOut()} style={styles.logoutBtn}><IconLogout /> 退出</button>
-      </div>
-
-      <div style={styles.userInfo}>
-        <div style={styles.avatar}>
-          {session?.user?.image
-            ? <img src={session.user.image} alt="" style={styles.avatarImg} />
-            : <IconSettings />}
-        </div>
-        <div>
-          <div style={styles.userName}>{session?.user?.name || '用户'}</div>
-          <div style={styles.userEmail}>{session?.user?.email}</div>
-        </div>
-      </div>
-
-      {message && <div style={styles.msg}>{message}</div>}
-
+    <div style={styles.container}>
       <div style={styles.card}>
+        <h1 style={styles.title}>个人设置</h1>
+
+        <div style={styles.accountBox}>
+          <div style={styles.accountRow}>
+            <IconMail />
+            <span style={styles.accountEmail}>{session?.user?.email}</span>
+          </div>
+          {(session?.user as any)?.needsEmailVerify && (
+            <div style={styles.verifyBox}>
+              <span style={styles.verifyText}>⚠️ 需要验证邮箱</span>
+              <button onClick={handleResendVerification} disabled={resending} style={styles.resendBtn}>
+                {resending ? '发送中...' : '发送验证邮件'}
+              </button>
+            </div>
+          )}
+        </div>
+
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>API 密钥（给爸爸妈妈填）</h2>
           <p style={styles.sectionDesc}>这里需要请爸爸妈妈帮忙填写，会加密存储，放心使用。</p>
@@ -298,129 +238,89 @@ export default function Settings() {
             <div style={styles.keyGuideTip}>💡 也可以用 <a href="https://siliconflow.cn" target="_blank" style={styles.keyGuideLink}>SiliconFlow</a> 的兼容接口（免费额度更多）</div>
           </div>
 
-          {keyStatus === 'has' && (
-            <div style={styles.keyInfo}>
-              <span>当前：{maskedKey}</span>
-              <button onClick={handleDeleteKey} style={styles.dangerBtn}>删除</button>
+          {keyStatus === 'has' && maskedKey ? (
+            <div style={styles.keyRow}>
+              <input type="text" value={maskedKey} readOnly style={styles.input} />
+              <button onClick={handleRemoveKey} style={styles.removeBtn}>删除</button>
+            </div>
+          ) : (
+            <div style={styles.keyRow}>
+              <input
+                type="password"
+                placeholder="sk-ant-..."
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                style={styles.input}
+              />
+              <button onClick={handleSaveKey} disabled={keyStatus === 'saving'} style={{ ...styles.btn, ...(keyStatus === 'saving' ? styles.btnDisabled : {}) }}>
+                保存
+              </button>
             </div>
           )}
-
-          <div style={styles.keyInputRow}>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder="sk-ant-..."
-              style={styles.keyInput}
-            />
-            <button
-              onClick={handleSaveKey}
-              disabled={!apiKey.trim() || keyStatus === 'saving'}
-              style={{ ...styles.primaryBtn, ...(!apiKey.trim() ? styles.btnDisabled : {}) }}
-            >
-              保存
-            </button>
-          </div>
-          <input
-            type="text"
-            value={apiBaseUrl}
-            onChange={e => setApiBaseUrl(e.target.value)}
-            placeholder="API 接口地址（如 https://api.siliconflow.cn/v1）"
-            style={{ ...styles.keyInput, marginBottom: '8px', fontSize: '12px', fontFamily: 'monospace' }}
-          />
-          <a href="https://console.anthropic.com" target="_blank" style={styles.extLink}>
-            获取 Claude API Key
-          </a>
         </section>
 
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>API 接口地址</h2>
-          <p style={styles.sectionDesc}>如果使用 SiliconFlow，保持默认即可。如需使用其他兼容接口，请填写完整地址（如 https://api.openai.com/v1）。</p>
-          <input
-            type="text"
-            value={apiBaseUrl}
-            onChange={e => setApiBaseUrl(e.target.value)}
-            placeholder="https://api.siliconflow.cn/v1"
-            style={styles.keyInput}
-          />
-        </section>
+          <h2 style={styles.sectionTitle}>学习偏好</h2>
+          <label style={styles.label}>默认学科</label>
+          <select value={defaultSubject} onChange={e => setDefaultSubject(e.target.value)} style={styles.input}>
+            <option value="数学">数学</option>
+            <option value="语文">语文</option>
+            <option value="英语">英语</option>
+            <option value="其他">其他</option>
+          </select>
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>我的偏好</h2>
+          <label style={styles.label}>默认模型</label>
+          <ModelSelector key={modelRefreshKey} />
 
-          <div style={styles.settingRow}>
-            <label style={styles.settingLabel}>常学的学科</label>
-            <select value={defaultSubject} onChange={e => setDefaultSubject(e.target.value)} style={styles.select}>
-              <option value="数学">数学</option>
-              <option value="语文">语文</option>
-              <option value="英语">英语</option>
-              <option value="其他">其他</option>
-            </select>
-          </div>
-
-          <div style={styles.settingRow}>
-            <label style={styles.settingLabel}>AI 模型</label>
-          </div>
-          <ModelSelector refreshKey={modelRefreshKey} />
-
-          <div style={{ ...styles.settingRow, marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eef0f4' }}>
-            <div>
-              <label style={styles.settingLabel}>使用模式</label>
-              <div style={{ fontSize: '11px', color: '#8e95a2', marginTop: '2px' }}>
-                {mode === 'student' ? '只看趋势汇总，不暴露单题细节' : '可查看全部批改细节'}
-              </div>
-            </div>
+          <label style={styles.label}>隐私模式</label>
+          <div style={styles.modeToggleRow}>
             <button
-              onClick={() => setMode(m => m === 'student' ? 'parent' : 'student')}
-              style={{
-                ...styles.modeToggle,
-                ...(mode === 'parent' ? styles.modeToggleParent : {}),
-              }}
+              onClick={() => setMode('student')}
+              style={{ ...styles.modeToggle, ...(mode === 'student' ? styles.modeToggleActive : {}) }}
             >
-              {mode === 'student' ? '👤 学生模式' : '👨‍👩‍👧 家长模式'}
+              学生
+            </button>
+            <button
+              onClick={() => setMode('parent')}
+              style={{ ...styles.modeToggle, ...(mode === 'parent' ? styles.modeToggleParentActive : {}) }}
+            >
+              家长
             </button>
           </div>
 
-          <button onClick={handleSaveSettings} style={styles.primaryBtn}>保存</button>
+          <button onClick={handleSaveSettings} style={{ ...styles.btn, marginTop: '16px' }}>保存设置</button>
         </section>
+
+        {message && <div style={styles.message}>{message}</div>}
+
+        <button onClick={() => signOut({ callbackUrl: '/settings' })} style={styles.logoutBtn}>
+          <IconLogout /> 退出登录
+        </button>
       </div>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { maxWidth: '480px', margin: '0 auto', padding: '20px 16px 80px', background: '#f8f9fc', minHeight: '100vh' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' },
-  title: { fontSize: '22px', fontWeight: 700, color: '#1a1a2e', margin: 0 },
-  logoutBtn: { display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 14px', fontSize: '12px', color: '#8e95a2', background: '#f0f2f5', border: 'none', borderRadius: '8px', cursor: 'pointer' },
-  loading: { textAlign: 'center', padding: '40px', color: '#8e95a2' },
-  loginForm: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '8px' },
-  loginInput: { width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', boxSizing: 'border-box' },
-  loginError: { padding: '10px 14px', borderRadius: '8px', background: '#fff5f5', color: '#d63031', fontSize: '12px' },
-  codeSentInfo: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#27ae60', fontWeight: 500 },
-  linkBtn: { background: 'none', border: 'none', color: '#4f6ef7', fontSize: '13px', cursor: 'pointer', padding: 0, textAlign: 'center' },
-  userInfo: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4', marginBottom: '16px' },
-  avatar: { width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#eef1ff', color: '#4f6ef7' },
-  avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  userName: { fontSize: '15px', fontWeight: 600, color: '#1a1a2e' },
-  userEmail: { fontSize: '12px', color: '#8e95a2' },
-  msg: { padding: '10px 14px', borderRadius: '8px', background: '#eafaf1', color: '#27ae60', fontSize: '12px', marginBottom: '12px' },
-  card: { background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #eef0f4' },
-  section: { marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #eef0f4' },
-  sectionTitle: { fontSize: '15px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 4px 0' },
-  sectionDesc: { fontSize: '12px', color: '#8e95a2', margin: '0 0 12px 0', lineHeight: '1.5' },
-  keyInfo: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#eef1ff', borderRadius: '8px', fontSize: '12px', color: '#4f6ef7', fontWeight: 500, marginBottom: '10px' },
-  dangerBtn: { padding: '4px 10px', fontSize: '11px', color: '#d63031', background: '#fff5f5', border: '1px solid #ffd5d5', borderRadius: '6px', cursor: 'pointer' },
-  keyInputRow: { display: 'flex', gap: '8px', marginBottom: '8px' },
-  keyInput: { flex: 1, padding: '10px 12px', fontSize: '14px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', fontFamily: 'monospace' },
-  primaryBtn: { padding: '10px 20px', fontSize: '14px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '8px', cursor: 'pointer' },
-  btnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
-  extLink: { display: 'inline-block', fontSize: '12px', color: '#4f6ef7', textDecoration: 'none' },
-  settingRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
-  settingLabel: { fontSize: '13px', fontWeight: 500, color: '#555' },
-  select: { padding: '8px 12px', fontSize: '12px', border: '1px solid #e0e4ee', borderRadius: '8px', outline: 'none', color: '#333', background: 'white' },
-  modeToggle: { padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#4f6ef7', background: '#eef1ff', border: '1px solid #d0d8ff', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' },
-  modeToggleParent: { color: '#e67e22', background: '#fef9e7', borderColor: '#fce4b3' },
+  container: { maxWidth: '480px', margin: '0 auto', padding: '20px 16px 80px', background: '#f8f9fc', minHeight: '100vh' },
+  loadingBox: { textAlign: 'center', padding: '40px', color: '#8e95a2' },
+  card: { background: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #eef0f4', marginBottom: '16px' },
+  title: { fontSize: '22px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 20px 0' },
+  input: { width: '100%', padding: '12px 14px', fontSize: '14px', border: '1px solid #e0e4ee', borderRadius: '10px', outline: 'none', marginBottom: '12px', boxSizing: 'border-box' },
+  btn: { padding: '12px 20px', fontSize: '14px', fontWeight: 600, color: 'white', background: '#4f6ef7', border: 'none', borderRadius: '10px', cursor: 'pointer' },
+  btnDisabled: { opacity: 0.6, cursor: 'not-allowed' },
+  error: { padding: '10px', background: '#fff5f5', color: '#d63031', borderRadius: '8px', fontSize: '13px', marginBottom: '12px' },
+  footer: { fontSize: '13px', color: '#8e95a2', textAlign: 'center', marginTop: '20px', marginBottom: 0 },
+  link: { color: '#4f6ef7', textDecoration: 'none', fontWeight: 600 },
+  accountBox: { padding: '14px', background: '#f8f9fc', borderRadius: '10px', marginBottom: '20px' },
+  accountRow: { display: 'flex', alignItems: 'center', gap: '8px' },
+  accountEmail: { fontSize: '14px', fontWeight: 500, color: '#1a1a2e' },
+  verifyBox: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', padding: '8px', background: '#fff3cd', borderRadius: '6px' },
+  verifyText: { fontSize: '13px', color: '#856404' },
+  resendBtn: { padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: '#856404', background: 'transparent', border: '1px solid #856404', borderRadius: '6px', cursor: 'pointer' },
+  section: { marginBottom: '24px', border: '1px solid #eef0f4', borderRadius: '12px', padding: '16px' },
+  sectionTitle: { fontSize: '16px', fontWeight: 700, color: '#1a1a2e', margin: '0 0 6px 0' },
+  sectionDesc: { fontSize: '13px', color: '#8e95a2', margin: '0 0 12px 0' },
   keyGuideBox: { padding: '12px 14px', background: '#f8f9fc', borderRadius: '8px', marginBottom: '12px', border: '1px solid #eef0f4' },
   keyGuideTitle: { fontSize: '13px', fontWeight: 600, color: '#1a1a2e', marginBottom: '8px' },
   keyGuideSteps: { display: 'flex', flexDirection: 'column', gap: '6px' },
@@ -429,4 +329,13 @@ const styles: Record<string, React.CSSProperties> = {
   keyGuideLink: { color: '#4f6ef7', textDecoration: 'none' },
   keyGuideCode: { background: '#eef1ff', color: '#4f6ef7', padding: '1px 5px', borderRadius: '3px', fontSize: '11px' },
   keyGuideTip: { marginTop: '8px', fontSize: '11px', color: '#8e95a2', lineHeight: '1.5' },
+  keyRow: { display: 'flex', gap: '8px' },
+  removeBtn: { padding: '12px 16px', fontSize: '14px', fontWeight: 600, color: '#d63031', background: 'white', border: '1px solid #d63031', borderRadius: '10px', cursor: 'pointer', whiteSpace: 'nowrap' },
+  label: { display: 'block', fontSize: '13px', fontWeight: 600, color: '#555', marginBottom: '4px' },
+  modeToggleRow: { display: 'flex', gap: '8px', marginBottom: '12px' },
+  modeToggle: { flex: 1, padding: '8px', fontSize: '13px', fontWeight: 600, color: '#4f6ef7', background: 'white', border: '1px solid #d0d8ff', borderRadius: '8px', cursor: 'pointer' },
+  modeToggleActive: { color: '#4f6ef7', background: '#eef1ff' },
+  modeToggleParentActive: { color: '#e67e22', background: '#fef9e7', borderColor: '#fce4b3' },
+  message: { padding: '10px', background: '#eafaf1', color: '#27ae60', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', textAlign: 'center' },
+  logoutBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#d63031', background: 'white', border: '1px solid #d63031', borderRadius: '10px', cursor: 'pointer', marginTop: '8px' },
 };
