@@ -8,6 +8,8 @@ import { ModelSelector } from './components/ModelSelector';
 import { IconCamera, IconCheck, IconX } from '../lib/icons';
 import { preprocessImage } from '../lib/image-preprocess';
 import { ocrImageClient, isOcrReliable } from '../lib/ocr-client';
+import { splitQuestions, estimateTime } from '../lib/question-splitter';
+import { QuestionSelector } from './components/QuestionSelector';
 
 const SUBJECTS = ['数学', '语文', '英语', '其他'];
 
@@ -25,6 +27,10 @@ export default function Home() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [subject, setSubject] = useState('数学');
+  const [detectedQuestions, setDetectedQuestions] = useState<string[]>([]);
+  const [showSelector, setShowSelector] = useState(false);
+  const [batchResults, setBatchResults] = useState<GradingResult[]>([]);
+  const [estimatedLabel, setEstimatedLabel] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -74,11 +80,24 @@ export default function Home() {
 
       if (cancelRef.current.signal.aborted) return;
 
+      const model = (typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null) || '';
+
+      if (ocrText && ocrText.trim().length > 5) {
+        const split = splitQuestions(ocrText);
+        if (split.questions.length > 1) {
+          setDetectedQuestions(split.questions);
+          setEstimatedLabel(estimateTime(split.questions.length).label);
+          setShowSelector(true);
+          setLoading(false);
+          stopTimer();
+          return;
+        }
+      }
+
       const formData = new FormData();
       formData.append('image', processed.blob, rawFile.name);
       if (ocrText) formData.append('ocrText', ocrText);
-      const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
-      if (savedModel) formData.append('model', savedModel);
+      if (model) formData.append('model', model);
 
       setLoadingDetail(ocrText ? '正在AI分析文字...' : '正在AI分析图片...');
       const response = await fetch('/api/correct', {
@@ -94,6 +113,7 @@ export default function Home() {
         setError(data.error);
       } else if (data.grading) {
         setGrading(data.grading);
+        setBatchResults([]);
         setShowAnswer(false);
         setImageUrl(data.imageUrl || null);
         setLoadingDetail('完成啦');
@@ -108,6 +128,51 @@ export default function Home() {
       }
     } finally {
       stopTimer(); setLoading(false); setLoadingDetail('');
+    }
+  };
+
+  const handleBatchGrade = async (questions: string[]) => {
+    setShowSelector(false);
+    setLoading(true);
+    setBatchResults([]);
+    setGrading(null);
+    setError('');
+    setSaved(false);
+    startTimer();
+
+    try {
+      cancelRef.current = new AbortController();
+      setLoadingDetail('正在批量批改...');
+
+      const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
+      const response = await fetch('/api/correct/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions, model: savedModel || undefined }),
+        signal: cancelRef.current.signal,
+      });
+      const data = await response.json();
+
+      if (cancelRef.current.signal.aborted) return;
+
+      if (data.error) {
+        setError(data.error);
+      } else if (data.results) {
+        setBatchResults(data.results);
+        setLoadingDetail(`完成 ${data.results.length} 题批改`);
+      } else {
+        setError('没有拿到结果，再试一次吧');
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        setError('已取消');
+      } else {
+        setError('好像出了点小问题，再试一次吧');
+      }
+    } finally {
+      stopTimer();
+      setLoading(false);
+      setLoadingDetail('');
     }
   };
 
@@ -136,6 +201,7 @@ export default function Home() {
     if (file) {
       setPreview(URL.createObjectURL(file));
       setError(''); setGrading(null); setSaved(false);
+      setBatchResults([]); setShowSelector(false); setDetectedQuestions([]);
     }
   };
 
@@ -161,6 +227,17 @@ export default function Home() {
           </a>
         </div>
       </div>
+    );
+  }
+
+  if (showSelector) {
+    return (
+      <QuestionSelector
+        questions={detectedQuestions}
+        onConfirm={handleBatchGrade}
+        onCancel={() => { setShowSelector(false); setDetectedQuestions([]); }}
+        estimatedLabel={estimatedLabel}
+      />
     );
   }
 
@@ -290,6 +367,35 @@ export default function Home() {
           )}
         </div>
       )}
+
+      {batchResults.length > 0 && (
+        <div style={styles.batchResult}>
+          <div style={styles.batchHeader}>
+            <span style={styles.batchTitle}>📋 批量批改结果</span>
+            <span style={styles.batchCount}>{batchResults.length} 题</span>
+          </div>
+          {batchResults.map((r, i) => (
+            <div key={i} style={styles.batchItem}>
+              <div style={styles.batchItemHeader}>
+                <span style={styles.batchItemNum}>第 {i + 1} 题</span>
+                <span style={r.is_correct ? styles.verdictOk : styles.verdictBad}>
+                  {r.is_correct ? '✅ 正确' : '❌ 需订正'}
+                </span>
+              </div>
+              {r.error_type && <div style={styles.batchTag}>❌ {r.error_type}</div>}
+              {r.knowledge_point && <div style={styles.batchTag}>📚 {r.knowledge_point}</div>}
+              {!r.is_correct && r.guidance && <div style={styles.batchContent}>{r.guidance}</div>}
+              {!r.is_correct && r.correct_solution && (
+                <details style={styles.batchDetails}>
+                  <summary style={styles.batchSummary}>查看答案</summary>
+                  <div style={styles.batchContent}>{r.correct_solution}</div>
+                  {r.analysis && <div style={styles.batchContent}>💡 {r.analysis}</div>}
+                </details>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -348,4 +454,15 @@ const styles: Record<string, React.CSSProperties> = {
   nextActions: { display: 'flex', gap: '8px', marginTop: '10px' },
   nextActionBtn: { flex: 1, display: 'block', padding: '10px 0', fontSize: '12px', fontWeight: 600, color: 'white', background: '#4f6ef7', textDecoration: 'none', borderRadius: '8px', textAlign: 'center' },
   cancelBtn: { width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#d63031', background: 'white', border: '1px solid #d63031', borderRadius: '12px', cursor: 'pointer', marginTop: '8px' },
+  batchResult: { marginTop: '16px' },
+  batchHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 4px' },
+  batchTitle: { fontSize: '16px', fontWeight: 700, color: '#1a1a2e' },
+  batchCount: { fontSize: '13px', color: '#8e95a2', background: '#f0f2f5', padding: '2px 10px', borderRadius: '12px' },
+  batchItem: { padding: '14px', background: 'white', borderRadius: '12px', border: '1px solid #eef0f4', marginBottom: '10px' },
+  batchItemHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
+  batchItemNum: { fontSize: '14px', fontWeight: 600, color: '#4f6ef7' },
+  batchTag: { fontSize: '13px', color: '#555', marginBottom: '4px' },
+  batchContent: { fontSize: '13px', color: '#333', lineHeight: '1.6', marginTop: '6px' },
+  batchDetails: { marginTop: '8px' },
+  batchSummary: { fontSize: '13px', color: '#4f6ef7', cursor: 'pointer', fontWeight: 500 },
 };

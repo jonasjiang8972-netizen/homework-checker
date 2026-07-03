@@ -53,7 +53,8 @@ describe('/api/plans auth guard', () => {
 
   it('GET 未登录应返回 401', async () => {
     const { GET } = await import('../app/api/plans/route');
-    const res = await GET();
+    const req = createRequest();
+    const res = await GET(req);
     const json = await res.json();
     expect(res.status).toBe(401);
     expect(json.error).toContain('请先登录');
@@ -100,7 +101,8 @@ describe('/api/quiz auth guard', () => {
 
   it('GET 未登录应返回 401', async () => {
     const { GET } = await import('../app/api/quiz/route');
-    const res = await GET();
+    const req = createRequest();
+    const res = await GET(req);
     const json = await res.json();
     expect(res.status).toBe(401);
     expect(json.error).toContain('请先登录');
@@ -125,7 +127,8 @@ describe('/api/user/settings auth guard', () => {
 
   it('GET 未登录应返回 401', async () => {
     const { GET } = await import('../app/api/user/settings/route');
-    const res = await GET();
+    const req = createRequest();
+    const res = await GET(req);
     const json = await res.json();
     expect(res.status).toBe(401);
     expect(json.error).toContain('请先登录');
@@ -146,7 +149,8 @@ describe('/api/user/key auth guard', () => {
 
   it('GET 未登录应返回 401', async () => {
     const { GET } = await import('../app/api/user/key/route');
-    const res = await GET();
+    const req = createRequest();
+    const res = await GET(req);
     const json = await res.json();
     expect(res.status).toBe(401);
     expect(json.error).toContain('请先登录');
@@ -163,7 +167,8 @@ describe('/api/user/key auth guard', () => {
 
   it('DELETE 未登录应返回 401', async () => {
     const { DELETE } = await import('../app/api/user/key/route');
-    const res = await DELETE();
+    const req = createRequest();
+    const res = await DELETE(req);
     const json = await res.json();
     expect(res.status).toBe(401);
     expect(json.error).toContain('请先登录');

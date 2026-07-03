@@ -4,6 +4,22 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.11.0] - 2026-07-04
+
+### 多题拍照批改（Multi-Question Photo Grading）
+
+#### 智能题目切分
+- **新增 `lib/question-splitter.ts`**：自动识别 OCR 文本中的多道题目，支持 `1.`、`1、`、`(1)`、`一、` 等多种题号格式，无法识别题号时按空行 + 长度启发式分割
+
+#### 批量批改 API
+- **新增 `POST /api/correct/batch`**：接收切分后的题目数组，≤3 题并行批改、>3 题串行排队，逐题调用现有文字批改 / 视觉批改逻辑
+
+#### 题目选择 UI
+- **新增 `components/QuestionSelector.tsx`**：OCR 切分后弹出题目列表预览，用户可勾选/取消要批改的题目，支持全选
+
+#### 前端集成
+- **`app/page.tsx` 流程扩展**：OCR 后先切题 → 单题直接批改 → 多题显示选择器 → 批量提交 → 逐题展示结果
+
 ## [2.10.0] - 2026-07-01
 
 ### 学习闭环修复 & 体验优化（Learning Loop Fixes & UX Improvements）
