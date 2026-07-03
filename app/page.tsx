@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import type { GradingResult } from '../lib/grading';
 import { MarkdownRenderer } from '../lib/markdown-renderer';
 import { ModelSelector } from './components/ModelSelector';
 import { IconCamera, IconCheck, IconX } from '../lib/icons';
+import { preprocessImage } from '../lib/image-preprocess';
+import { ocrImageClient, isOcrReliable } from '../lib/ocr-client';
 
 const SUBJECTS = ['数学', '语文', '英语', '其他'];
 
@@ -26,27 +28,11 @@ export default function Home() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      if (file.size < 1.5 * 1024 * 1024) { resolve(file); return; }
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxW = 1600;
-        const scale = Math.min(1, maxW / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          (blob) => { URL.revokeObjectURL(url); resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file); },
-          'image/jpeg', 0.85
-        );
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-      img.src = url;
-    });
-  };
+  const cancelRef = useRef<AbortController | null>(null);
+
+  const handleCancel = useCallback(() => {
+    cancelRef.current?.abort();
+  }, []);
 
   const startTimer = () => {
     setElapsed(0); setSlowWarning(false);
@@ -65,25 +51,44 @@ export default function Home() {
     const rawFile = fileInput?.files?.[0];
     if (!rawFile) return;
 
+    cancelRef.current = new AbortController();
     setLoading(true); setGrading(null); setError(''); setSaved(false); setSlowWarning(false);
     setSavedQuestionId(null);
     startTimer();
-    setLoadingDetail('正在准备图片...');
 
     try {
-      const compressed = await compressImage(rawFile);
-      setLoadingDetail('正在上传图片...');
+      setLoadingDetail('正在优化图片...');
+      const processed = await preprocessImage(rawFile);
+
+      setLoadingDetail('正在识别文字...');
+      let ocrText: string | null = null;
+      try {
+        const ocrResult = await Promise.race([
+          ocrImageClient(processed.blob),
+          new Promise<never>((_, r) => setTimeout(() => r(new Error('OCR timeout')), 12000)),
+        ]);
+        if (isOcrReliable(ocrResult)) {
+          ocrText = ocrResult.text;
+        }
+      } catch {}
+
+      if (cancelRef.current.signal.aborted) return;
 
       const formData = new FormData();
-      formData.append('image', compressed);
+      formData.append('image', processed.blob, rawFile.name);
+      if (ocrText) formData.append('ocrText', ocrText);
       const savedModel = typeof window !== 'undefined' ? localStorage.getItem('selectedModel') : null;
       if (savedModel) formData.append('model', savedModel);
 
-      setLoadingDetail('正在检查图片...');
-
-      setLoadingDetail('正在AI批改...');
-      const response = await fetch('/api/correct', { method: 'POST', body: formData });
+      setLoadingDetail(ocrText ? '正在AI分析文字...' : '正在AI分析图片...');
+      const response = await fetch('/api/correct', {
+        method: 'POST',
+        body: formData,
+        signal: cancelRef.current.signal,
+      });
       const data = await response.json();
+
+      if (cancelRef.current.signal.aborted) return;
 
       if (data.error) {
         setError(data.error);
@@ -95,8 +100,12 @@ export default function Home() {
       } else {
         setError('没有拿到结果，再试一次吧');
       }
-    } catch {
-      setError('好像出了点小问题，再试一次吧');
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        setError('已取消');
+      } else {
+        setError('好像出了点小问题，再试一次吧');
+      }
     } finally {
       stopTimer(); setLoading(false); setLoadingDetail('');
     }
@@ -218,6 +227,12 @@ export default function Home() {
             style={{ ...styles.btn, ...(!preview ? styles.btnDisabled : {}) }}
           >帮我看看</button>
         )}
+
+        {loading && (
+          <button type="button" onClick={handleCancel} style={styles.cancelBtn}>
+            取消
+          </button>
+        )}
       </form>
 
       {grading && (
@@ -332,4 +347,5 @@ const styles: Record<string, React.CSSProperties> = {
   tag: { fontSize: '12px', fontWeight: 500, padding: '3px 8px', borderRadius: '6px', background: '#eef1ff', color: '#4f6ef7' },
   nextActions: { display: 'flex', gap: '8px', marginTop: '10px' },
   nextActionBtn: { flex: 1, display: 'block', padding: '10px 0', fontSize: '12px', fontWeight: 600, color: 'white', background: '#4f6ef7', textDecoration: 'none', borderRadius: '8px', textAlign: 'center' },
+  cancelBtn: { width: '100%', padding: '12px', fontSize: '14px', fontWeight: 600, color: '#d63031', background: 'white', border: '1px solid #d63031', borderRadius: '12px', cursor: 'pointer', marginTop: '8px' },
 };

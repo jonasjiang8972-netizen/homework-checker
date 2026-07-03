@@ -22,20 +22,13 @@ const EMPTY: GradingResult = {
   knowledge_tags: [],
 };
 
-export const GRADING_PROMPT = [
-  '你是一位耐心负责的初中数学老师。请批改这道题，并以 JSON 格式输出结果，不要输出 JSON 以外的任何文字。',
-  'JSON 字段说明：',
-  '- is_correct: 布尔值，答案是否完全正确',
-  '- error_type: 错误类型，从 ["计算失误","概念不清","审题错误","方法错误"] 中选一个；若全对填"全部正确"',
-  '- knowledge_point: 这道题考查的核心知识点名称（如"一元一次方程"）',
-  '- guidance: 引导提示（仅对错题）。不要直接给答案，而是给出引导性的问题或思路提示，帮助孩子自己发现错误。格式为纯文本，简短有力。全对则填""',
-  '- error_spot: 错在哪一步（全对则填"无"）',
-  '- correct_solution: 完整的正确解题过程（含详细步骤）',
-  '- analysis: 错因分析，为什么会错，要讲清楚',
-  '- knowledge_tags: 相关知识点标签数组',
-  '只返回 JSON，示例：',
-  '{"is_correct":false,"error_type":"计算失误","knowledge_point":"一元一次方程","guidance":"检查一下去括号时符号有没有变对？","error_spot":"第二步去括号未变号","correct_solution":"2x-2=6 -> 2x=8 -> x=4...","analysis":"对去括号时负号的处理掌握不牢","knowledge_tags":["去括号","一元一次方程"]}',
-].join('\n');
+export const GRADING_PROMPT = `你是初中数学老师。批改此题，只输出JSON。
+字段：is_correct(Boolean)、error_type(计算失误/概念不清/审题错误/方法错误/全部正确)、knowledge_point(String)、guidance(引导提示，全对留空)、error_spot(全对写"无")、correct_solution(正确步骤)、analysis(错因)、knowledge_tags(数组)。
+简洁输出，correct_solution限3步内，analysis限1句话。不要JSON外的文字。`;
+
+export const GRADING_PROMPT_TEXT = `你是初中数学老师。批改以下OCR提取的题目文字，只输出JSON。
+字段：is_correct(Boolean)、error_type(计算失误/概念不清/审题错误/方法错误/全部正确)、knowledge_point(String)、guidance(引导提示，全对留空)、error_spot(全对写"无")、correct_solution(正确步骤)、analysis(错因)、knowledge_tags(数组)。
+简洁输出，correct_solution限3步内，analysis限1句话。不要JSON外的文字。`;
 
 export function parseGrading(raw: string): GradingResult {
   if (!raw) return EMPTY;
