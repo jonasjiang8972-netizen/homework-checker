@@ -9,3 +9,5 @@ npm-debug.log*
 *.md
 .DS_Store
 *.tsbuildinfo
+data
+coverage

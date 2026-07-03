@@ -140,6 +140,49 @@ function initSchema(db: SqlJsDatabase) {
   try { db.run("ALTER TABLE users ADD COLUMN email_verify_sent_at TEXT"); } catch {}
   try { db.run("ALTER TABLE users ADD COLUMN email_due_at TEXT"); } catch {}
   try { db.run("ALTER TABLE users ADD COLUMN last_login_at TEXT"); } catch {}
+
+  migrateOldUsers(db);
+}
+
+/** Migrate existing users (identified by email as user_id) to the new users table */
+function migrateOldUsers(db: SqlJsDatabase) {
+  const looksLikeEmail = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  const tables = ['questions', 'knowledge_points', 'study_plans', 'test_records', 'user_settings'];
+
+  const emailSet = new Set<string>();
+  for (const table of tables) {
+    try {
+      const rows = db.exec(`SELECT DISTINCT user_id FROM ${table} WHERE user_id IS NOT NULL`);
+      if (rows.length && rows[0].values) {
+        for (const row of rows[0].values) {
+          const uid = row[0] as string;
+          if (looksLikeEmail(uid)) emailSet.add(uid);
+        }
+      }
+    } catch {}
+  }
+
+  for (const email of emailSet) {
+    try {
+      const existing = db.exec('SELECT id FROM users WHERE email = ?', [email]);
+      if (existing.length && existing[0].values?.length) continue;
+
+      const id = generateId();
+      db.run(
+        `INSERT INTO users (id, email, password_hash, name, email_verified, email_due_at)
+         VALUES (?, ?, ?, ?, 1, ?)`,
+        [id, email, 'MIGRATED_RESET_REQUIRED', email.split('@')[0], new Date(Date.now() + 30 * 86400000).toISOString()]
+      );
+
+      for (const table of tables) {
+        try {
+          db.run(`UPDATE ${table} SET user_id = ? WHERE user_id = ?`, [id, email]);
+        } catch {}
+      }
+    } catch {}
+  }
+
+  saveDb();
 }
 
 export function queryAll(sql: string, params: any[] = []): Record<string, any>[] {
