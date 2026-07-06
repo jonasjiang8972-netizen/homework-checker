@@ -49,10 +49,18 @@ function renderMath(text: string): string {
   return result;
 }
 
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript:/gi, '');
+}
+
 function renderMarkdown(text: string): string {
   const withMath = renderMath(text);
   try {
-    return marked.parse(withMath, { async: false }) as string;
+    const raw = marked.parse(withMath, { async: false }) as string;
+    return sanitizeHtml(raw);
   } catch {
     return text;
   }

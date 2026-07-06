@@ -32,5 +32,17 @@ export function checkRateLimit(
 }
 
 export function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const xpi = (request as any).ip;
+  if (xpi) return xpi;
+
+  const xri = request.headers.get('x-real-ip');
+  if (xri && /^[0-9a-fA-F.:]+$/.test(xri.trim())) return xri.trim();
+
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) {
+    const ip = xff.split(',')[0]?.trim();
+    if (ip && /^[0-9a-fA-F.:]+$/.test(ip)) return ip;
+  }
+
+  return 'unknown';
 }

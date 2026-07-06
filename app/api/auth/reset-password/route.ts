@@ -18,8 +18,14 @@ export async function POST(request: NextRequest) {
 
   await getDb();
 
-  const user = queryOne('SELECT id FROM users WHERE email_verify_token = ?', [token]);
+  const user = queryOne('SELECT id, email_verify_sent_at FROM users WHERE email_verify_token = ?', [token]);
   if (!user) return NextResponse.json({ error: '重置链接无效或已过期' }, { status: 400 });
+
+  const sentAt = user.email_verify_sent_at ? new Date(user.email_verify_sent_at).getTime() : 0;
+  if (Date.now() - sentAt > 15 * 60 * 1000) {
+    execute('UPDATE users SET email_verify_token = NULL WHERE id = ?', [user.id]);
+    return NextResponse.json({ error: '重置链接已过期，请重新获取' }, { status: 400 });
+  }
 
   const passwordHash = await hashPassword(password);
   execute(
@@ -35,8 +41,14 @@ export async function GET(request: NextRequest) {
   if (!token) return NextResponse.json({ error: '缺少重置令牌' }, { status: 400 });
 
   await getDb();
-  const user = queryOne('SELECT id FROM users WHERE email_verify_token = ?', [token]);
+  const user = queryOne('SELECT id, email_verify_sent_at FROM users WHERE email_verify_token = ?', [token]);
   if (!user) return NextResponse.json({ error: '重置链接无效或已过期' }, { status: 400 });
+
+  const sentAt = user.email_verify_sent_at ? new Date(user.email_verify_sent_at).getTime() : 0;
+  if (Date.now() - sentAt > 15 * 60 * 1000) {
+    execute('UPDATE users SET email_verify_token = NULL WHERE id = ?', [user.id]);
+    return NextResponse.json({ error: '重置链接已过期，请重新获取' }, { status: 400 });
+  }
 
   return NextResponse.json({ ok: true, email: user.id });
 }

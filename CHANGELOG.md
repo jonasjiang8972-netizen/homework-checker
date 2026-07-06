@@ -4,6 +4,34 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.12.0] - 2026-07-07
+
+### 安全修复 & 关键 Bug 修复（Security & Critical Bug Fixes）
+
+#### XSS 漏洞修复
+- **修复 `lib/markdown-renderer.tsx`**：AI 返回的 HTML 内容在渲染前增加 sanitize 处理，移除 `<script>` 标签、`on*` 事件处理器和 `javascript:` URI
+
+#### 会话安全
+- **修复 `app/api/auth/[...nextauth]/route.ts`**：Session Cookie `secure` 标志改为根据 `NODE_ENV` 动态设置，生产环境强制 HTTPS
+
+#### SMTP 安全
+- **修复 `lib/email.ts`**：TLS `rejectUnauthorized` 改为生产环境启用证书验证，防止 MITM 凭据窃取
+
+#### 限流安全
+- **修复 `lib/rate-limit.ts`**：`getClientIp()` 优先使用真实 socket IP，增加 IP 格式校验防止伪造绕过限流
+
+#### 密码重置安全
+- **修复 `app/api/auth/reset-password/route.ts`**：重置 Token 增加 15 分钟过期验证，过期自动清除令牌
+
+#### 密钥校验
+- **修复 `lib/encryption.ts`**：`API_KEY_ENCRYPTION_SECRET` 在模块加载时立即校验，未配置直接拒绝启动
+
+#### OCR 识别修复
+- **修复 `lib/ocr-client.ts`**: 中文字符检测正则 `/一-龥/g` → `/[鿿]/g`，修复 OCR 可靠性判断失效
+
+#### 测试配置
+- **修复 `vitest.config.ts`**：测试环境增加 `API_KEY_ENCRYPTION_SECRET` 等环境变量，避免启动校验阻断测试
+
 ## [2.11.0] - 2026-07-04
 
 ### 多题拍照批改（Multi-Question Photo Grading）

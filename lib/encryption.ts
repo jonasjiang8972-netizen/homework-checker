@@ -1,5 +1,9 @@
 import crypto from 'crypto';
 
+if (!process.env.API_KEY_ENCRYPTION_SECRET) {
+  throw new Error('FATAL: API_KEY_ENCRYPTION_SECRET is required but not set');
+}
+
 function getMasterKey(): Buffer {
   const secret = process.env.API_KEY_ENCRYPTION_SECRET;
   if (!secret) throw new Error('API_KEY_ENCRYPTION_SECRET not configured');

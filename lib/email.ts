@@ -13,7 +13,7 @@ export async function sendVerificationCode(to: string, token: string, baseUrl?: 
     auth: { user: SMTP_USER, pass: SMTP_PASS },
     connectionTimeout: 15000,
     socketTimeout: 15000,
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: process.env.NODE_ENV !== 'production' },
     family: 4,
   } as any);
 
