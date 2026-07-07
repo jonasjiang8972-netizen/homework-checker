@@ -10,6 +10,7 @@ class QueryBuilder {
   private orderBy = '';
   private orderAsc = true;
   private singleMode = false;
+  private limitCount: number | null = null;
 
   constructor(table: string) { this.table = table; }
 
@@ -41,6 +42,8 @@ class QueryBuilder {
     return this;
   }
 
+  limit(n: number) { this.limitCount = n > 0 ? Math.floor(n) : null; return this; }
+
   single() { this.singleMode = true; return this; }
 
   private buildWhere(): string {
@@ -54,6 +57,7 @@ class QueryBuilder {
       const where = this.buildWhere();
       let sql = `SELECT ${this.columns} FROM "${this.table}"${where}`;
       if (this.orderBy) sql += ` ORDER BY "${this.orderBy}" ${this.orderAsc ? 'ASC' : 'DESC'}`;
+      if (this.limitCount !== null) sql += ` LIMIT ${this.limitCount}`;
       const rows = queryAll(sql, this.params);
       const data = this.singleMode ? (rows.length > 0 ? rows[0] : null) : rows;
       return { data, error: null };

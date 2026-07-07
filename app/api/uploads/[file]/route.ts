@@ -3,6 +3,9 @@ import { checkRateLimit, getClientIp } from '../../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import { join, sep } from 'node:path';
+import { startUploadCleanup } from '../../../../lib/upload-cleanup';
+
+startUploadCleanup();
 
 const MIME_MAP: Record<string, string> = {
   jpg: 'image/jpeg',

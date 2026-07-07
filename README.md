@@ -4,7 +4,7 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.12.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.13.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
 [![Tests](https://img.shields.io/badge/tests-67_✓-brightgreen)]()

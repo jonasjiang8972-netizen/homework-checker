@@ -15,6 +15,8 @@ const mockQueryBuilder = {
   neq: vi.fn().mockReturnThis(),
   in: vi.fn().mockReturnThis(),
   order: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockReturnThis(),
+  range: vi.fn().mockReturnThis(),
   single: vi.fn().mockResolvedValue({ data: null, error: null }),
   then: vi.fn(function (cb: any) { return Promise.resolve(cb({ data: [], error: null })); }),
   insert: vi.fn().mockReturnThis(),

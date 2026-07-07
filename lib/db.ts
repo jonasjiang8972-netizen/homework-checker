@@ -206,6 +206,21 @@ export function execute(sql: string, params: any[] = []) {
   saveDb();
 }
 
+export function executeBatch(operations: Array<{ sql: string; params?: any[] }>) {
+  if (!_db) throw new Error('Database not initialized');
+  try {
+    _db.run('BEGIN TRANSACTION');
+    for (const op of operations) {
+      _db.run(op.sql, op.params || []);
+    }
+    _db.run('COMMIT');
+    saveDb();
+  } catch (e) {
+    try { _db.run('ROLLBACK'); } catch {}
+    throw e;
+  }
+}
+
 export function generateId(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';

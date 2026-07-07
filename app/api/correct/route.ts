@@ -6,6 +6,9 @@ import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
+import { startUploadCleanup } from '../../../lib/upload-cleanup';
+
+startUploadCleanup();
 
 const DEFAULT_MODEL = 'meituan/longcat-2.0';
 const VISION_TIMEOUT_MS = 90000;

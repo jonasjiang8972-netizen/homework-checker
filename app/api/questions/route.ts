@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
   const filterError = searchParams.get('filter_error');
   const filterErrorType = searchParams.get('filter_error_type');
 
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('page_size') || '20', 10)));
+
   let query = supabase.from('questions').select('id, question, error_analysis, subject, image_url, is_correct, knowledge_point, error_type, created_at, user_id').eq('user_id', userId);
   if (filterKp) {
     query = query.eq('knowledge_point', filterKp);
@@ -40,14 +43,14 @@ export async function GET(request: NextRequest) {
     query = query.eq('error_type', filterErrorType);
   }
 
-  query = query.order(sortBy, { ascending: order === 'asc' });
+  query = query.order(sortBy, { ascending: order === 'asc' }).limit(pageSize);
 
   const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: '获取数据失败' }, { status: 500 });
   }
-  return NextResponse.json({ data: data || [] });
+  return NextResponse.json({ data: data || [], page, page_size: pageSize });
 }
 
 export async function POST(request: NextRequest) {

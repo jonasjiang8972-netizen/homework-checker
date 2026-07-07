@@ -1,13 +1,18 @@
 import crypto from 'crypto';
 
-if (!process.env.API_KEY_ENCRYPTION_SECRET) {
-  throw new Error('FATAL: API_KEY_ENCRYPTION_SECRET is required but not set');
+let _keyValidated = false;
+
+function ensureKey(): void {
+  if (_keyValidated) return;
+  if (!process.env.API_KEY_ENCRYPTION_SECRET) {
+    throw new Error('API_KEY_ENCRYPTION_SECRET not configured');
+  }
+  _keyValidated = true;
 }
 
 function getMasterKey(): Buffer {
-  const secret = process.env.API_KEY_ENCRYPTION_SECRET;
-  if (!secret) throw new Error('API_KEY_ENCRYPTION_SECRET not configured');
-  return crypto.createHash('sha256').update(secret).digest();
+  ensureKey();
+  return crypto.createHash('sha256').update(process.env.API_KEY_ENCRYPTION_SECRET!).digest();
 }
 
 const ALGORITHM = 'aes-256-gcm';

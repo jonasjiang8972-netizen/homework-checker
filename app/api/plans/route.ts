@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       current_mastery: 30,
       target_mastery: 80,
       status: 'pending',
-      steps: p.steps,
+      steps: JSON.stringify(p.steps),
       due_date: null,
     }));
 

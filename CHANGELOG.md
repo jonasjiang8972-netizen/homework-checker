@@ -4,6 +4,33 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.13.0] - 2026-07-07
+
+### 稳定性与可维护性优化（Stability & Maintainability）
+
+#### 数据库
+- **新增 `executeBatch`**：`lib/db.ts` 增加事务支持（`BEGIN TRANSACTION` / `COMMIT` / `ROLLBACK`），多步写入原子化避免部分失败
+
+#### 文件管理
+- **新增 `lib/upload-cleanup.ts`**：定期清理 24 小时前的过期上传文件（1 小时周期），防止磁盘耗尽
+- **新增 `lib/backup.ts`**：每日自动备份 SQLite 数据库到 `data/backups/`，保留 7 天
+
+#### 健康检查
+- **新增 `GET /api/health`**：返回服务状态、运行时长、DB 连通性（200/503）
+
+#### API 优化
+- **`/api/questions` 分页**：新增 `page` 和 `page_size` 参数，单次最多返回 100 条
+- **`study_plans.steps` JSON 序列化**：写入数据库前强制 `JSON.stringify`，防止类型不一致
+
+#### 死代码清理
+- **删除 `lib/data-recycler.ts`**：未使用的浏览器 localStorage 工具类
+- **删除 `lib/auth-store.ts`**：未使用的旧邮箱验证码 Map 存储（原路由有独立的 codeStore 实现）
+- **删除 `__tests__/auth-store.test.ts`**：相应测试
+
+#### Supabase 包增加
+- **`QueryBuilder.limit()`**：`lib/supabase.ts` 增加 limit 方法支持，配合分页使用
+- **测试 mock 更新**：测试 mock 增加 limit/range 方法
+
 ## [2.12.0] - 2026-07-07
 
 ### 安全修复 & 关键 Bug 修复（Security & Critical Bug Fixes）
