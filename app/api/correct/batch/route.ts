@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { GRADING_PROMPT, parseGrading, GradingResult } from '../../../../lib/grading';
+import { buildGradingPrompt, parseGrading, failedGrading, GradingResult } from '../../../../lib/grading';
 import { getApiKey, getApiBaseUrl } from '../../../../lib/auth-utils';
+import { normalizeKnowledgePoint } from '../../../../lib/knowledge-points';
 import { checkRateLimit, getClientIp } from '../../../../lib/rate-limit';
 
 const DEFAULT_MODEL = 'meituan/longcat-2.0';
 const TEXT_TIMEOUT_MS = 30000;
 
-async function callTextGrading(ocrText: string, model: string): Promise<string> {
+async function callTextGrading(ocrText: string, model: string, prompt: string): Promise<string> {
   const apiKey = await getApiKey();
   if (!apiKey) throw new Error('No API key');
 
@@ -23,7 +24,7 @@ async function callTextGrading(ocrText: string, model: string): Promise<string> 
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'user', content: [{ type: 'text', text: `题目文字：\n${ocrText}` }, { type: 'text', text: GRADING_PROMPT }] },
+          { role: 'user', content: [{ type: 'text', text: `题目文字：\n${ocrText}` }, { type: 'text', text: prompt }] },
         ],
         max_tokens: 800,
         temperature: 0.2,
@@ -43,31 +44,30 @@ async function callTextGrading(ocrText: string, model: string): Promise<string> 
   }
 }
 
-async function gradeQuestion(text: string, model: string): Promise<GradingResult> {
-  try {
-    const raw = await callTextGrading(text, model);
-    if (raw) return parseGrading(raw);
-  } catch {}
-  return {
-    is_correct: false,
-    error_type: '',
-    knowledge_point: '',
-    guidance: '',
-    error_spot: '',
-    correct_solution: '',
-    analysis: '批改失败，请重试',
-    knowledge_tags: [],
-  };
+async function gradeQuestion(text: string, model: string, subject: string, grade: string): Promise<GradingResult> {
+  const prompt = buildGradingPrompt({ subject, grade, mode: 'batch' });
+  // 最多尝试 2 次：网络错误或输出非 JSON 都重试一次
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const raw = await callTextGrading(text, model, prompt);
+      const g = parseGrading(raw);
+      if (!g.failed) {
+        if (g.knowledge_point) g.knowledge_point = normalizeKnowledgePoint(g.knowledge_point, subject);
+        return g;
+      }
+    } catch {}
+  }
+  return failedGrading();
 }
 
-async function gradeParallel(questions: string[], model: string): Promise<GradingResult[]> {
-  return Promise.all(questions.map(q => gradeQuestion(q, model)));
+async function gradeParallel(questions: string[], model: string, subject: string, grade: string): Promise<GradingResult[]> {
+  return Promise.all(questions.map(q => gradeQuestion(q, model, subject, grade)));
 }
 
-async function gradeSerial(questions: string[], model: string): Promise<GradingResult[]> {
+async function gradeSerial(questions: string[], model: string, subject: string, grade: string): Promise<GradingResult[]> {
   const results: GradingResult[] = [];
   for (const q of questions) {
-    results.push(await gradeQuestion(q, model));
+    results.push(await gradeQuestion(q, model, subject, grade));
   }
   return results;
 }
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '未配置 API Key' }, { status: 503 });
   }
 
-  let body: { questions?: string[]; model?: string };
+  let body: { questions?: string[]; model?: string; subject?: string; grade?: string };
   try {
     body = await request.json();
   } catch {
@@ -103,6 +103,8 @@ export async function POST(request: NextRequest) {
   }
 
   const model = body.model || DEFAULT_MODEL;
+  const subject = String(body.subject || '数学').slice(0, 20);
+  const grade = String(body.grade || '').slice(0, 20);
 
   const cleanQuestions = body.questions
     .map(q => q.trim())
@@ -114,8 +116,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const results = cleanQuestions.length <= 3
-      ? await gradeParallel(cleanQuestions, model)
-      : await gradeSerial(cleanQuestions, model);
+      ? await gradeParallel(cleanQuestions, model, subject, grade)
+      : await gradeSerial(cleanQuestions, model, subject, grade);
 
     return NextResponse.json({
       results,

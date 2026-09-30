@@ -130,3 +130,27 @@ describe('aggregateStats', () => {
     expect(unclassified?.totalCount).toBe(2);
   });
 });
+
+import { applyForgetting } from '../lib/mastery';
+
+describe('applyForgetting', () => {
+  const now = Date.parse('2026-07-31T00:00:00Z');
+  const daysAgo = (d: number) => new Date(now - d * 86_400_000).toISOString();
+
+  it('宽限期内不衰减', () => {
+    expect(applyForgetting(90, daysAgo(2), now)).toBe(90);
+  });
+  it('超过宽限期后向 50 回落', () => {
+    const v = applyForgetting(90, daysAgo(33), now);
+    expect(v).toBe(70); // 一个半衰期：50 + 40 * 0.5
+    expect(applyForgetting(90, daysAgo(120), now)).toBeLessThan(v);
+  });
+  it('低于 50 的薄弱点不上调', () => {
+    expect(applyForgetting(30, daysAgo(200), now)).toBe(30);
+  });
+  it('支持 SQLite UTC 时间格式，缺失或非法时不变', () => {
+    expect(applyForgetting(90, '2026-06-27 00:00:00', now)).toBe(70);
+    expect(applyForgetting(90, null, now)).toBe(90);
+    expect(applyForgetting(90, 'garbage', now)).toBe(90);
+  });
+});

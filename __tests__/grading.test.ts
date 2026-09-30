@@ -150,3 +150,44 @@ describe('gradingToText', () => {
     expect(text).not.toContain('🏷️');
   });
 });
+
+import { buildGradingPrompt, failedGrading, isGradingUsable } from '../lib/grading';
+
+describe('批改失败处理', () => {
+  it('无效 JSON 与空输入应标记 failed', () => {
+    expect(parseGrading('不是JSON').failed).toBe(true);
+    expect(parseGrading('').failed).toBe(true);
+  });
+  it('有效 JSON 不应标记 failed', () => {
+    expect(parseGrading('{"is_correct":true}').failed).toBeUndefined();
+  });
+  it('failed 结果不可用于统计', () => {
+    expect(isGradingUsable(failedGrading())).toBe(false);
+    expect(isGradingUsable(parseGrading('{"is_correct":false}'))).toBe(true);
+    expect(isGradingUsable(null)).toBe(false);
+  });
+  it('应解析 confidence 并忽略越界值', () => {
+    expect(parseGrading('{"is_correct":true,"confidence":0.3}').confidence).toBe(0.3);
+    expect(parseGrading('{"is_correct":true,"confidence":5}').confidence).toBeUndefined();
+  });
+});
+
+describe('buildGradingPrompt', () => {
+  it('应按学科和年级生成', () => {
+    const p = buildGradingPrompt({ subject: '英语', grade: '小学五年级' });
+    expect(p).toContain('小学五年级英语老师');
+    expect(p).toContain('动词时态');
+    expect(p).not.toContain('初中数学');
+  });
+  it('默认是初中数学并包含数学知识点库', () => {
+    const p = buildGradingPrompt();
+    expect(p).toContain('初中数学老师');
+    expect(p).toContain('一元二次方程');
+  });
+  it('OCR 模式应提示识别错误', () => {
+    expect(buildGradingPrompt({ mode: 'text' })).toContain('OCR');
+  });
+  it('未知学科不限定知识点列表', () => {
+    expect(buildGradingPrompt({ subject: '物理' })).toContain('最具体的知识点');
+  });
+});

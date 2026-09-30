@@ -98,6 +98,7 @@ export default function Home() {
       formData.append('image', processed.blob, rawFile.name);
       if (ocrText) formData.append('ocrText', ocrText);
       if (model) formData.append('model', model);
+      formData.append('subject', subject);
 
       setLoadingDetail(ocrText ? '正在AI分析文字...' : '正在AI分析图片...');
       const response = await fetch('/api/correct', {
@@ -148,7 +149,7 @@ export default function Home() {
       const response = await fetch('/api/correct/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions, model: savedModel || undefined }),
+        body: JSON.stringify({ questions, model: savedModel || undefined, subject }),
         signal: cancelRef.current.signal,
       });
       const data = await response.json();
@@ -317,6 +318,11 @@ export default function Home() {
           <div style={grading.is_correct ? styles.verdictOk : styles.verdictBad}>
             {grading.is_correct ? <><IconCheck /> 全对，真棒</> : <><IconX /> 一起看看怎么改进</>}
           </div>
+          {grading.confidence !== undefined && grading.confidence < 0.5 && (
+            <div style={{ margin: '8px 0', padding: '8px 12px', borderRadius: '8px', background: '#fff7e6', color: '#ad6800', fontSize: '13px' }}>
+              ⚠️ AI 对这次判断把握不大，建议请家长或老师再确认一下
+            </div>
+          )}
           {!grading.is_correct && grading.error_type && <Tag label="订正类型" value={grading.error_type} />}
           {grading.knowledge_point && <Tag label="知识点" value={grading.knowledge_point} />}
           {!grading.is_correct && grading.guidance && (
@@ -378,8 +384,8 @@ export default function Home() {
             <div key={i} style={styles.batchItem}>
               <div style={styles.batchItemHeader}>
                 <span style={styles.batchItemNum}>第 {i + 1} 题</span>
-                <span style={r.is_correct ? styles.verdictOk : styles.verdictBad}>
-                  {r.is_correct ? '✅ 正确' : '❌ 需订正'}
+                <span style={r.failed ? styles.batchCount : r.is_correct ? styles.verdictOk : styles.verdictBad}>
+                  {r.failed ? '⚠️ 批改失败，请重试' : r.is_correct ? '✅ 正确' : '❌ 需订正'}
                 </span>
               </div>
               {r.error_type && <div style={styles.batchTag}>❌ {r.error_type}</div>}

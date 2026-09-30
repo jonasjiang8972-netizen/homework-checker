@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { GRADING_PROMPT, parseGrading } from '../../../lib/grading';
+import { buildGradingPrompt, parseGrading, type GradingResult } from '../../../lib/grading';
 import { getApiKey, getApiBaseUrl } from '../../../lib/auth-utils';
 import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
+import { normalizeKnowledgePoint } from '../../../lib/knowledge-points';
 import { startUploadCleanup } from '../../../lib/upload-cleanup';
 
 startUploadCleanup();
@@ -43,17 +44,17 @@ async function fetchAI(messages: any[], model: string, maxTokens: number, temper
   }
 }
 
-async function callVisionGrading(imageBase64: string, contentType: string, model: string): Promise<string> {
+async function callVisionGrading(imageBase64: string, contentType: string, model: string, prompt: string): Promise<string> {
   const dataUrl = `data:${contentType};base64,${imageBase64}`;
   return fetchAI(
-    [{ role: 'user', content: [{ type: 'image_url', image_url: { url: dataUrl } }, { type: 'text', text: GRADING_PROMPT }] }],
+    [{ role: 'user', content: [{ type: 'image_url', image_url: { url: dataUrl } }, { type: 'text', text: prompt }] }],
     model, 800, 0.2, VISION_TIMEOUT_MS,
   );
 }
 
-async function callTextGrading(ocrText: string, model: string): Promise<string> {
+async function callTextGrading(ocrText: string, model: string, prompt: string): Promise<string> {
   return fetchAI(
-    [{ role: 'user', content: [{ type: 'text', text: `题目文字：\n${ocrText}` }, { type: 'text', text: GRADING_PROMPT }] }],
+    [{ role: 'user', content: [{ type: 'text', text: `题目文字：\n${ocrText}` }, { type: 'text', text: prompt }] }],
     model, 800, 0.2, TEXT_TIMEOUT_MS,
   );
 }
@@ -84,6 +85,10 @@ export async function POST(request: NextRequest) {
   }
 
   const model = (formData.get('model') as string) || DEFAULT_MODEL;
+  const subject = ((formData.get('subject') as string) || '数学').slice(0, 20);
+  const grade = ((formData.get('grade') as string) || '').slice(0, 20);
+  const visionPrompt = buildGradingPrompt({ subject, grade, mode: 'image' });
+  const textPrompt = buildGradingPrompt({ subject, grade, mode: 'text' });
 
   let imageUrl: string | null = null;
   let bytes: Buffer | null = null;
@@ -112,13 +117,13 @@ export async function POST(request: NextRequest) {
 
     if (ocrText && ocrText.trim().length > 5) {
       try {
-        raw = await callTextGrading(ocrText.trim(), model);
+        raw = await callTextGrading(ocrText.trim(), model, textPrompt);
       } catch { raw = ''; }
     }
 
     if (!raw && imageBase64) {
       try {
-        raw = await callVisionGrading(imageBase64, contentType, model);
+        raw = await callVisionGrading(imageBase64, contentType, model, visionPrompt);
       } catch { raw = ''; }
     }
 
@@ -130,7 +135,7 @@ export async function POST(request: NextRequest) {
           new Promise<string>((_, r) => setTimeout(() => r(new Error('OCR timeout')), 15000)),
         ]);
         if (serverOcrText && serverOcrText.trim().length > 5) {
-          raw = await callTextGrading(serverOcrText.trim(), model);
+          raw = await callTextGrading(serverOcrText.trim(), model, textPrompt);
         }
       } catch {}
     }
@@ -139,7 +144,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '批改超时，请重试或换更清晰的图片' }, { status: 504 });
     }
 
-    const grading = parseGrading(raw);
+    let grading: GradingResult = parseGrading(raw);
+    // 模型输出非 JSON 时重试一次，仍失败则报错，避免把格式错误当成「答错」
+    if (grading.failed && imageBase64) {
+      try { grading = parseGrading(await callVisionGrading(imageBase64, contentType, model, visionPrompt)); } catch {}
+    }
+    if (grading.failed) {
+      return NextResponse.json({ error: '批改结果解析失败，请重试或换更清晰的图片' }, { status: 502 });
+    }
+    if (grading.knowledge_point) grading.knowledge_point = normalizeKnowledgePoint(grading.knowledge_point, subject);
     return NextResponse.json({ grading, imageUrl, processingTime: Date.now() - startTime });
   } catch (error) {
     return NextResponse.json({ error: '批改服务暂时不可用，请稍后再试' }, { status: 502 });

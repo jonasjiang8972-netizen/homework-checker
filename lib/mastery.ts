@@ -91,3 +91,27 @@ export function updateMasteryDelta(
     correct: prevCorrect + (isCorrect ? 1 : 0),
   };
 }
+
+const NEUTRAL = 50;
+const GRACE_DAYS = 3;
+const HALF_LIFE_DAYS = 30;
+
+/**
+ * 遗忘衰减：超过宽限期未练习，高于初始值的掌握度按指数衰减向 50 回落。
+ * 低于 50 的薄弱点不上调（不能因为没练习就"变好"）。
+ */
+export function applyForgetting(
+  mastery: number,
+  lastPracticedAt: string | null | undefined,
+  now: number = Date.now(),
+): number {
+  if (!lastPracticedAt || mastery <= NEUTRAL) return mastery;
+  // SQLite datetime('now') 是 UTC 且没有时区标记
+  const iso = lastPracticedAt.includes('T') ? lastPracticedAt : lastPracticedAt.replace(' ', 'T') + 'Z';
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return mastery;
+  const days = (now - t) / 86_400_000;
+  if (days <= GRACE_DAYS) return mastery;
+  const retain = Math.pow(0.5, (days - GRACE_DAYS) / HALF_LIFE_DAYS);
+  return Math.round(NEUTRAL + (mastery - NEUTRAL) * retain);
+}

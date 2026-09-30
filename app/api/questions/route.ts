@@ -3,8 +3,9 @@ import { getUserId } from '../../../lib/auth-utils';
 import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, queryOne, execute, generateId } from '../../../lib/db';
-import { calculateNewMastery } from '../../../lib/mastery';
-import type { GradingResult } from '../../../lib/grading';
+import { calculateNewMastery, applyForgetting } from '../../../lib/mastery';
+import { isGradingUsable, type GradingResult } from '../../../lib/grading';
+import { normalizeKnowledgePoint } from '../../../lib/knowledge-points';
 
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
@@ -75,7 +76,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '请求格式错误' }, { status: 400 });
   }
 
-  const grading = body.grading;
+  const subject = body.subject || '数学';
+  if (body.grading && !isGradingUsable(body.grading)) {
+    return NextResponse.json({ error: '批改结果无效，未保存' }, { status: 422 });
+  }
+  const grading = body.grading
+    ? { ...body.grading, knowledge_point: body.grading.knowledge_point ? normalizeKnowledgePoint(body.grading.knowledge_point, subject) : '' }
+    : undefined;
 
   const { data, error } = await supabase
     .from('questions')
@@ -83,7 +90,7 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       question: body.question || '',
       error_analysis: body.errorAnalysis || '',
-      subject: body.subject || '数学',
+      subject,
       image_url: body.imageUrl || '',
       is_correct: grading?.is_correct ? 1 : 0,
       knowledge_point: grading?.knowledge_point || '',
@@ -101,10 +108,10 @@ export async function POST(request: NextRequest) {
     try {
       await getDb();
       const existing = queryOne(
-        'SELECT id, mastery_level, total_count, correct_count FROM knowledge_points WHERE name = ? AND user_id = ?',
+        'SELECT id, mastery_level, total_count, correct_count, last_practiced_at FROM knowledge_points WHERE name = ? AND user_id = ?',
         [grading.knowledge_point, userId]
       );
-      const prevMastery = existing?.mastery_level ?? 50;
+      const prevMastery = applyForgetting(existing?.mastery_level ?? 50, existing?.last_practiced_at as string | undefined);
       const prevTotal = existing?.total_count ?? 0;
       const prevCorrect = existing?.correct_count ?? 0;
       const newMastery = calculateNewMastery(prevMastery, grading.is_correct, prevTotal);
@@ -116,7 +123,7 @@ export async function POST(request: NextRequest) {
       } else {
         execute(
           'INSERT INTO knowledge_points (id, name, subject, mastery_level, total_count, correct_count, last_practiced_at, user_id) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'), ?)',
-          [generateId(), grading.knowledge_point, body.subject || '数学', newMastery, prevTotal + 1, prevCorrect + (grading.is_correct ? 1 : 0), userId]
+          [generateId(), grading.knowledge_point, subject, newMastery, prevTotal + 1, prevCorrect + (grading.is_correct ? 1 : 0), userId]
         );
       }
     } catch {}
