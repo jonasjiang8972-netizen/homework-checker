@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '请先登录后再查看学习统计' }, { status: 401 });
   }
 
-  if (!checkRateLimit('stats', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('stats', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 

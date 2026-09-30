@@ -9,17 +9,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('user-settings', session.user.email, 20, 60_000)) {
+  if (!(await checkRateLimit('user-settings', session.user.email, 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
-  const row = queryOne('SELECT default_subject, default_model, mode, base_url FROM user_settings WHERE user_id = ?', [session.user.email]);
+  const row = queryOne('SELECT default_subject, default_model, mode, base_url, parent_email, weekly_report FROM user_settings WHERE user_id = ?', [session.user.email]);
 
   return NextResponse.json({
     defaultSubject: row?.default_subject || '数学',
     defaultModel: row?.default_model || 'claude-3-5-sonnet-latest',
     mode: row?.mode || 'student',
     apiBaseUrl: row?.base_url || null,
+    parentEmail: row?.parent_email || '',
+    weeklyReport: !!row?.weekly_report,
   });
 }
 
@@ -29,11 +31,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('user-settings', session.user.email, 20, 60_000)) {
+  if (!(await checkRateLimit('user-settings', session.user.email, 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
-  let body: { defaultSubject?: string; defaultModel?: string; mode?: string; apiBaseUrl?: string };
+  let body: { defaultSubject?: string; defaultModel?: string; mode?: string; apiBaseUrl?: string; parentEmail?: string; weeklyReport?: boolean };
   try {
     body = await request.json();
   } catch {

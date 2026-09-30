@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { IconChart, IconTarget, IconStar, IconFileText } from '../../lib/icons';
+import { TrendPanel } from '../components/TrendPanel';
+import { ReviewBanner } from '../components/ReviewBanner';
 
 interface KnowledgePointStat {
   name: string;
@@ -106,6 +108,9 @@ const masteryLabel = (level: number) => {
       <div style={styles.header}>
         <h1 style={styles.title}>我的学习地图 🗺️</h1>
       </div>
+
+      <ReviewBanner />
+      <TrendPanel subject={subject} />
 
       {subjects.length > 1 && (
         <div style={styles.subjectBar}>

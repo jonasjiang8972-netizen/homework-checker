@@ -134,6 +134,7 @@ export default function History() {
     <div style={styles.page}>
       <div style={styles.header}>
         <h1 style={styles.title}>我的成长日记</h1>
+        <a href="/export" style={{ fontSize: '12px', color: '#4f6ef7', textDecoration: 'none' }}>🖨️ 导出错题 / 练习卷</a>
       </div>
 
       {!loading && !fetchError && questions.length > 0 && (

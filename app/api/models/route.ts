@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ models: [], error: '请先登录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('models', session.user.email, 30, 60_000)) {
+  if (!(await checkRateLimit('models', session.user.email, 30, 60_000))) {
     return NextResponse.json({ models: [], error: '操作太频繁' }, { status: 429 });
   }
 

@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
-  if (!checkRateLimit('register', `ip:${ip}`, 3, 300_000)) {
+  if (!(await checkRateLimit('register', `ip:${ip}`, 3, 300_000))) {
     return NextResponse.json({ error: '操作太频繁，请 5 分钟后再试' }, { status: 429 });
   }
 

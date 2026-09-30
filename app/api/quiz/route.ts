@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '请先登录后再查看测验记录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('quiz', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('quiz', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '未配置 Claude API Key，请在设置页添加或配置环境变量' }, { status: 503 });
   }
 
-  if (!checkRateLimit('quiz', getClientIp(request), 15, 60_000)) {
+  if (!(await checkRateLimit('quiz', getClientIp(request), 15, 60_000))) {
     return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
 

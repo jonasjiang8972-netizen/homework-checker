@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { IconSettings, IconLogout, IconMail, IconCheck } from '../../lib/icons';
 import { ModelSelector } from '../components/ModelSelector';
+import { ReportSettings } from '../components/ReportSettings';
 
 export default function Settings() {
   const { data: session, status } = useSession();
@@ -290,6 +291,8 @@ export default function Settings() {
 
           <button onClick={handleSaveSettings} style={{ ...styles.btn, marginTop: '16px' }}>保存设置</button>
         </section>
+
+        <ReportSettings />
 
         {message && <div style={styles.message}>{message}</div>}
 

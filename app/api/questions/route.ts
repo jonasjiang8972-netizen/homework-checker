@@ -3,6 +3,7 @@ import { getUserId } from '../../../lib/auth-utils';
 import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, queryOne, execute, generateId } from '../../../lib/db';
+import { initialReview } from '../../../lib/srs';
 import { calculateNewMastery, applyForgetting } from '../../../lib/mastery';
 import { isGradingUsable, type GradingResult } from '../../../lib/grading';
 import { normalizeKnowledgePoint } from '../../../lib/knowledge-points';
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '请先登录后再查看题目记录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('questions', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('questions', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '请先登录后再保存题目' }, { status: 401 });
   }
 
-  if (!checkRateLimit('questions', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('questions', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
@@ -129,5 +130,18 @@ export async function POST(request: NextRequest) {
     } catch {}
   }
 
-  return NextResponse.json({ data: data?.[0] });
+  // 错题自动加入间隔复习计划（1/3/7/14/30 天）
+  const saved = data?.[0];
+  if (saved?.id && grading && !grading.is_correct) {
+    try {
+      await getDb();
+      const r = initialReview();
+      execute(
+        'INSERT OR IGNORE INTO review_items (id, user_id, question_id, knowledge_point, stage, next_review_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [generateId(), userId, saved.id, grading.knowledge_point || '', r.stage, r.nextReviewAt],
+      );
+    } catch {}
+  }
+
+  return NextResponse.json({ data: saved });
 }

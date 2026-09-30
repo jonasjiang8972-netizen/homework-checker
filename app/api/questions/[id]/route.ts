@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: '请先登录后再查看题目' }, { status: 401 });
   }
 
-  if (!checkRateLimit('questions', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('questions', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
@@ -32,7 +32,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: '请先登录后再删除题目' }, { status: 401 });
   }
 
-  if (!checkRateLimit('questions', getClientIp(request), 10, 60_000)) {
+  if (!(await checkRateLimit('questions', getClientIp(request), 10, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 

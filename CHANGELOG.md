@@ -4,6 +4,22 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [2.15.0] - 2026-09-30
+
+### 基础设施
+- **数据库换为 better-sqlite3**：WAL 模式、写入即落盘（原 sql.js 每次写入都导出整库），事务用原生 `transaction`；旧数据库文件可直接沿用；备份改用在线 `backup()`；新增 `DATA_DIR` 环境变量
+- **共享限流**：`checkRateLimit` 改为异步，配置 `UPSTASH_REDIS_REST_URL/TOKEN` 后使用 Redis 计数，出错时降级为内存计数
+- **安全头**：新增 CSP、HSTS（生产）、Permissions-Policy
+- Dockerfile 构建阶段加入 better-sqlite3 编译工具链，移除 sql.js wasm 拷贝
+
+### 新功能
+- **错题间隔复习**：错题保存时自动加入 1/3/7/14/30 天复习计划；新增 `/review` 页面、`/api/reviews`，复习结果同步掌握度；首页与学习地图显示待复习提示
+- **学习趋势**：`/api/stats/trend` + 学习地图趋势图（近 7/30 天正确率折线、错误类型分布）
+- **家长周报**：`/api/reports/weekly` 预览与立即发送、`/api/cron/weekly-report` 定时发送（`CRON_SECRET` 鉴权）、设置页家长邮箱与开关；只含汇总数据
+- **错题导出**：`/export` 页面，按时间/学科筛选，生成含答案的错题本或不含答案的练习卷，浏览器打印另存 PDF
+- **视觉模型切题**：`/api/correct/split`，OCR 不可靠或文字很长但未切出多题时由视觉模型直接切题
+- 新增 24 个测试（共 102 个）
+
 ## [2.14.0] - 2026-09-30
 
 ### 批改质量与掌握度可信度

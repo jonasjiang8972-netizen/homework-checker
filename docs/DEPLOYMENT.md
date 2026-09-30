@@ -164,6 +164,18 @@ docker-compose.yml 已配置 healthcheck，每 30s 检测 `localhost:3000` 可�
 
 ---
 
+## 6.1 v2.15 新增运维项
+
+- **数据库**：已从 sql.js 换为 better-sqlite3（原 `data/homework.db` 可直接沿用）。Docker 构建需要 `python3 make g++`（Dockerfile 已包含）。
+- **限流共享存储**：多实例部署请配置 `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`；单实例可不配。
+- **家长周报定时任务**：配置 `CRON_SECRET` 与 SMTP 后，用系统 cron 每周调用一次：
+
+  ```bash
+  0 20 * * 0 curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://your-host/api/cron/weekly-report
+  ```
+
+- **CSP**：浏览器端 OCR（tesseract.js）与 KaTeX 使用 `cdn.jsdelivr.net`、`tessdata.projectnaptha.com`；如改为自托管，请同步收紧 `next.config.js` 中的 CSP。
+
 ## 7. 部署检查清单
 
 上线前逐项确认：

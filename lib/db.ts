@@ -1,48 +1,48 @@
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import Database from 'better-sqlite3';
+import { mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
-const DB_DIR = join(process.cwd(), 'data');
+const DB_DIR = process.env.DATA_DIR || join(process.cwd(), 'data');
 const DB_PATH = join(DB_DIR, 'homework.db');
 
-let _db: SqlJsDatabase | null = null;
-let _init: Promise<void> | null = null;
+let _db: Database.Database | null = null;
 
-export async function getDb(): Promise<SqlJsDatabase> {
+/**
+ * 打开数据库（better-sqlite3，WAL 模式，写入即落盘）。
+ * 保持 async 签名以兼容原有调用方；旧的 sql.js 导出文件是标准 SQLite 格式，可直接沿用。
+ */
+export async function getDb(): Promise<Database.Database> {
+  return openDb();
+}
+
+function openDb(): Database.Database {
   if (_db) return _db;
-  if (_init) { await _init; return _db!; }
-
-  _init = (async () => {
-    const SQL = await initSqlJs({
-      locateFile: (file: string) => join(process.cwd(), 'node_modules/sql.js/dist', file),
-    });
-    if (!existsSync(DB_DIR)) mkdirSync(DB_DIR, { recursive: true });
-
-    if (existsSync(DB_PATH)) {
-      const buffer = readFileSync(DB_PATH);
-      _db = new SQL.Database(buffer);
-    } else {
-      _db = new SQL.Database();
-    }
-
-    _db.run('PRAGMA journal_mode = WAL');
-    _db.run('PRAGMA foreign_keys = ON');
-    initSchema(_db!);
-    saveDb();
-  })();
-
-  await _init;
-  return _db!;
+  if (!existsSync(DB_DIR)) mkdirSync(DB_DIR, { recursive: true });
+  const db = new Database(DB_PATH);
+  db.pragma('journal_mode = WAL');
+  db.pragma('busy_timeout = 5000');
+  db.pragma('foreign_keys = ON');
+  initSchema(db);
+  _db = db;
+  return db;
 }
 
-function saveDb() {
-  if (!_db) return;
-  const data = _db.export();
-  writeFileSync(DB_PATH, Buffer.from(data));
+/** 在线备份（写入进行中也安全） */
+export async function backupTo(dest: string): Promise<void> {
+  await openDb().backup(dest);
 }
 
-function initSchema(db: SqlJsDatabase) {
-  db.run(`
+/** 关闭连接（测试与优雅退出使用） */
+export function closeDb(): void {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+}
+
+function initSchema(db: Database.Database) {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge_points (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -122,6 +122,19 @@ function initSchema(db: SqlJsDatabase) {
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS review_items (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      question_id TEXT NOT NULL,
+      knowledge_point TEXT,
+      stage INTEGER DEFAULT 0,
+      next_review_at TEXT NOT NULL,
+      last_result INTEGER,
+      done INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     CREATE INDEX IF NOT EXISTS idx_users_verify_token ON users(email_verify_token);
 
@@ -131,99 +144,87 @@ function initSchema(db: SqlJsDatabase) {
     CREATE INDEX IF NOT EXISTS idx_tests_user ON test_records(user_id);
     CREATE INDEX IF NOT EXISTS idx_questions_user ON questions(user_id);
     CREATE INDEX IF NOT EXISTS idx_questions_kp ON questions(knowledge_point);
+    CREATE INDEX IF NOT EXISTS idx_questions_user_created ON questions(user_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_review_question ON review_items(question_id);
+    CREATE INDEX IF NOT EXISTS idx_review_due ON review_items(user_id, done, next_review_at);
   `);
 
-  try { db.run("ALTER TABLE user_settings ADD COLUMN base_url TEXT DEFAULT 'https://api.siliconflow.cn/v1'"); } catch {}
-  try { db.run("ALTER TABLE test_records ADD COLUMN subject TEXT DEFAULT '数学'"); } catch {}
-  try { db.run("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch {}
-  try { db.run("ALTER TABLE users ADD COLUMN email_verify_token TEXT"); } catch {}
-  try { db.run("ALTER TABLE users ADD COLUMN email_verify_sent_at TEXT"); } catch {}
-  try { db.run("ALTER TABLE users ADD COLUMN email_due_at TEXT"); } catch {}
-  try { db.run("ALTER TABLE users ADD COLUMN last_login_at TEXT"); } catch {}
+  const alters = [
+    "ALTER TABLE user_settings ADD COLUMN base_url TEXT DEFAULT 'https://api.siliconflow.cn/v1'",
+    "ALTER TABLE test_records ADD COLUMN subject TEXT DEFAULT '数学'",
+    'ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0',
+    'ALTER TABLE users ADD COLUMN email_verify_token TEXT',
+    'ALTER TABLE users ADD COLUMN email_verify_sent_at TEXT',
+    'ALTER TABLE users ADD COLUMN email_due_at TEXT',
+    'ALTER TABLE users ADD COLUMN last_login_at TEXT',
+    'ALTER TABLE user_settings ADD COLUMN parent_email TEXT',
+    'ALTER TABLE user_settings ADD COLUMN weekly_report INTEGER DEFAULT 0',
+    'ALTER TABLE user_settings ADD COLUMN last_report_at TEXT',
+  ];
+  for (const sql of alters) {
+    try { db.exec(sql); } catch {}
+  }
 
   migrateOldUsers(db);
 }
 
 /** Migrate existing users (identified by email as user_id) to the new users table */
-function migrateOldUsers(db: SqlJsDatabase) {
+function migrateOldUsers(db: Database.Database) {
   const looksLikeEmail = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
   const tables = ['questions', 'knowledge_points', 'study_plans', 'test_records', 'user_settings'];
 
   const emailSet = new Set<string>();
   for (const table of tables) {
     try {
-      const rows = db.exec(`SELECT DISTINCT user_id FROM ${table} WHERE user_id IS NOT NULL`);
-      if (rows.length && rows[0].values) {
-        for (const row of rows[0].values) {
-          const uid = row[0] as string;
-          if (looksLikeEmail(uid)) emailSet.add(uid);
-        }
+      const rows = db.prepare(`SELECT DISTINCT user_id FROM ${table} WHERE user_id IS NOT NULL`).all() as Array<{ user_id: string }>;
+      for (const { user_id: uid } of rows) {
+        if (looksLikeEmail(uid)) emailSet.add(uid);
       }
     } catch {}
   }
 
   for (const email of emailSet) {
     try {
-      const existing = db.exec('SELECT id FROM users WHERE email = ?', [email]);
-      if (existing.length && existing[0].values?.length) continue;
+      if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) continue;
 
       const id = generateId();
-      db.run(
+      db.prepare(
         `INSERT INTO users (id, email, password_hash, name, email_verified, email_due_at)
          VALUES (?, ?, ?, ?, 1, ?)`,
-        [id, email, 'MIGRATED_RESET_REQUIRED', email.split('@')[0], new Date(Date.now() + 30 * 86400000).toISOString()]
-      );
+      ).run(id, email, 'MIGRATED_RESET_REQUIRED', email.split('@')[0], new Date(Date.now() + 30 * 86400000).toISOString());
 
       for (const table of tables) {
         try {
-          db.run(`UPDATE ${table} SET user_id = ? WHERE user_id = ?`, [id, email]);
+          db.prepare(`UPDATE ${table} SET user_id = ? WHERE user_id = ?`).run(id, email);
         } catch {}
       }
     } catch {}
   }
-
-  saveDb();
 }
 
 export function queryAll(sql: string, params: any[] = []): Record<string, any>[] {
-  if (!_db) throw new Error('Database not initialized');
-  const stmt = _db.prepare(sql);
-  if (params.length > 0) stmt.bind(params);
-  const rows: Record<string, any>[] = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
+  return openDb().prepare(sql).all(...params) as Record<string, any>[];
 }
 
 export function queryOne(sql: string, params: any[] = []): Record<string, any> | null {
-  const rows = queryAll(sql, params);
-  return rows.length > 0 ? rows[0] : null;
+  return (openDb().prepare(sql).get(...params) as Record<string, any> | undefined) ?? null;
 }
 
 export function execute(sql: string, params: any[] = []) {
-  if (!_db) throw new Error('Database not initialized');
-  _db.run(sql, params);
-  saveDb();
+  openDb().prepare(sql).run(...params);
 }
 
 export function executeBatch(operations: Array<{ sql: string; params?: any[] }>) {
-  if (!_db) throw new Error('Database not initialized');
-  try {
-    _db.run('BEGIN TRANSACTION');
-    for (const op of operations) {
-      _db.run(op.sql, op.params || []);
-    }
-    _db.run('COMMIT');
-    saveDb();
-  } catch (e) {
-    try { _db.run('ROLLBACK'); } catch {}
-    throw e;
-  }
+  const db = openDb();
+  db.transaction(() => {
+    for (const op of operations) db.prepare(op.sql).run(...(op.params || []));
+  })();
 }
 
 export function generateId(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = randomBytes(24);
   let id = '';
-  for (let i = 0; i < 24; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 24; i++) id += chars[bytes[i] % chars.length];
   return id;
 }

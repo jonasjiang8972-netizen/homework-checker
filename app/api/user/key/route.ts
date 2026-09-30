@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('user-key', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('user-key', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
     }
 
-    if (!checkRateLimit('user-key', session.user.email, 10, 60_000)) {
+    if (!(await checkRateLimit('user-key', session.user.email, 10, 60_000))) {
       return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
     }
 
@@ -77,7 +77,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('user-key', session.user.email, 5, 60_000)) {
+  if (!(await checkRateLimit('user-key', session.user.email, 5, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 

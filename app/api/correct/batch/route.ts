@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: '请先登录后再使用批改功能' }, { status: 401 });
   }
 
-  if (!checkRateLimit('correct-batch', getClientIp(request), 5, 60_000)) {
+  if (!(await checkRateLimit('correct-batch', getClientIp(request), 5, 60_000))) {
     return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
 

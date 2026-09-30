@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '请先登录后再查看学习计划' }, { status: 401 });
   }
 
-  if (!checkRateLimit('plans', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('plans', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!checkRateLimit('plans', getClientIp(request), 5, 60_000)) {
+  if (!(await checkRateLimit('plans', getClientIp(request), 5, 60_000))) {
     return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
 
@@ -180,7 +180,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: '请先登录后再更新学习计划' }, { status: 401 });
   }
 
-  if (!checkRateLimit('plans', getClientIp(request), 20, 60_000)) {
+  if (!(await checkRateLimit('plans', getClientIp(request), 20, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 

@@ -7,6 +7,7 @@ import { MarkdownRenderer } from '../lib/markdown-renderer';
 import { ModelSelector } from './components/ModelSelector';
 import { IconCamera, IconCheck, IconX } from '../lib/icons';
 import { preprocessImage } from '../lib/image-preprocess';
+import { ReviewBanner } from './components/ReviewBanner';
 import { ocrImageClient, isOcrReliable } from '../lib/ocr-client';
 import { splitQuestions, estimateTime } from '../lib/question-splitter';
 import { QuestionSelector } from './components/QuestionSelector';
@@ -92,6 +93,36 @@ export default function Home() {
           stopTimer();
           return;
         }
+      }
+
+      // OCR 不可靠，或文字很长却没切出多题（多题排版常见）时，让视觉模型直接切题
+      const looksMulti = !ocrText || ocrText.trim().length >= 200;
+      if (looksMulti) {
+        setLoadingDetail('正在识别题目分布...');
+        try {
+          const splitForm = new FormData();
+          splitForm.append('image', processed.blob, rawFile.name);
+          splitForm.append('subject', subject);
+          if (model) splitForm.append('model', model);
+          const splitRes = await fetch('/api/correct/split', {
+            method: 'POST',
+            body: splitForm,
+            signal: cancelRef.current.signal,
+          });
+          const splitJson = await splitRes.json();
+          if (Array.isArray(splitJson.questions) && splitJson.questions.length > 1) {
+            const texts: string[] = splitJson.questions.map((q: { text: string }) => q.text);
+            setDetectedQuestions(texts);
+            setEstimatedLabel(estimateTime(texts.length).label);
+            setShowSelector(true);
+            setLoading(false);
+            stopTimer();
+            return;
+          }
+        } catch (e: any) {
+          if (e?.name === 'AbortError') throw e;
+        }
+        if (cancelRef.current.signal.aborted) return;
       }
 
       const formData = new FormData();
@@ -244,6 +275,7 @@ export default function Home() {
 
   return (
     <div style={styles.page}>
+      <ReviewBanner />
       <div style={styles.header}>
         <h1 style={styles.title}>作业小帮手</h1>
         <p style={styles.slogan}>每天进步一点点 🌱</p>

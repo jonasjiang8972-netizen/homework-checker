@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: '请先登录' }, { status: 401 });
   }
 
-  if (!checkRateLimit('uploads', getClientIp(request), 60, 60_000)) {
+  if (!(await checkRateLimit('uploads', getClientIp(request), 60, 60_000))) {
     return NextResponse.json({ error: '操作太频繁' }, { status: 429 });
   }
 

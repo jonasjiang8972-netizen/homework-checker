@@ -4,10 +4,10 @@
 
 **拍照上传 → AI 智能批改 → 知识点掌握度追踪 → 自适应学习计划**
 
-[![Version](https://img.shields.io/badge/version-2.14.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
+[![Version](https://img.shields.io/badge/version-2.15.0-blue.svg)](https://github.com/jonasjiang8972-netizen/homework-checker)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)](https://typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-78_✓-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-102_✓-brightgreen)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
@@ -38,6 +38,11 @@
 | 📝 **测验草稿保存** | 测验答案自动保存到本地，防止意外丢失 | ✅ 已实现（v2.10） |
 | 🎯 **闯关入口直达** | 底部导航栏新增闯关挑战入口 | ✅ 已实现（v2.10） |
 | 🔍 **错题分类筛选** | 支持按错误类型（计算失误/概念不清等）筛选 | ✅ 已实现（v2.10） |
+| 🔁 **间隔复习** | 错题按 1/3/7/14/30 天自动安排复习，结果同步掌握度 | ✅ 已实现（v2.15） |
+| 📈 **学习趋势** | 近 7/30 天正确率折线与错误类型分布 | ✅ 已实现（v2.15） |
+| 📧 **家长周报** | 每周汇总邮件（仅汇总，不含题目与图片） | ✅ 已实现（v2.15） |
+| 🖨️ **错题导出** | 错题本 / 练习卷，打印另存 PDF | ✅ 已实现（v2.15） |
+| ✂️ **视觉切题** | 视觉模型直接把整页作业切成独立题目 | ✅ 已实现（v2.15） |
 
 ---
 

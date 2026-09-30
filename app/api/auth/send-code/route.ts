@@ -29,10 +29,10 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
-  if (!checkRateLimit('send-code', `ip:${ip}`, 5, 60_000)) {
+  if (!(await checkRateLimit('send-code', `ip:${ip}`, 5, 60_000))) {
     return NextResponse.json({ error: '操作太频繁，请稍后再试' }, { status: 429 });
   }
-  if (!checkRateLimit('send-code', `email:${email}`, 3, 300_000)) {
+  if (!(await checkRateLimit('send-code', `email:${email}`, 3, 300_000))) {
     return NextResponse.json({ error: '该邮箱已发送多次验证码，请5分钟后再试' }, { status: 429 });
   }
 

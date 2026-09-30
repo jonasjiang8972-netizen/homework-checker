@@ -4,11 +4,16 @@ RUN apk add --no-cache libc6-compat
 
 FROM base AS deps
 
+# better-sqlite3 在 musl 上通常有预编译包；没有时回退到源码编译
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
 FROM base AS builder
+
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -32,9 +37,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 RUN mkdir -p /app/data/uploads /app/data && chown nextjs:nodejs /app/data/uploads /app/data
-
-RUN mkdir -p /app/node_modules/sql.js/dist
-COPY --from=builder /app/node_modules/sql.js/dist/sql-wasm.wasm /app/node_modules/sql.js/dist/sql-wasm.wasm
 
 COPY --from=deps /app/node_modules ./node_modules
 
